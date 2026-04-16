@@ -4,23 +4,21 @@
  */
 
 import type { Plugin } from 'rollup'
-import { resolve, join, dirname } from 'node:path'
+import { resolve, join } from 'node:path'
 import { readFileSync, mkdtempDisposableSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 import { Extractor, ExtractorConfig, ExtractorLogLevel } from '@microsoft/api-extractor'
 
-const projectFolder = dirname(fileURLToPath(import.meta.url))
-
-const formatHost: ts.FormatDiagnosticsHost = {
-  getCurrentDirectory: () => projectFolder,
-  getCanonicalFileName: (f) => f,
-  getNewLine: () => '\n',
-}
-
 export default function dts(): Plugin {
   let entryId: string
+  let projectFolder: string
+
+  const formatHost: ts.FormatDiagnosticsHost = {
+    getCurrentDirectory: () => projectFolder,
+    getCanonicalFileName: (f) => f,
+    getNewLine: () => '\n',
+  }
 
   return {
     name: 'rollup-dts-bundler',
@@ -31,6 +29,8 @@ export default function dts(): Plugin {
     },
 
     buildStart({ input }) {
+      projectFolder = process.cwd()
+
       const parsedInput = Array.isArray(input) ? input : Object.values(input)
       if (parsedInput.length !== 1) {
         this.error('Must have a single input entry point')

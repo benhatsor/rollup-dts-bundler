@@ -1,0 +1,39 @@
+{
+  "name": "rollup-dts-bundler",
+  "version": "1.0.0",
+  "description": "Rollup plugin for bundling .d.ts declarations via @microsoft/api-extractor.",
+  "author": "Ben Hatsor",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/benhatsor/rollup-dts-bundler.git"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@microsoft/api-extractor": "^7.58.2"
+  },
+  "peerDependencies": {
+    "rollup": "^4.0.0",
+    "typescript": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "rollup": "^4.60.1",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.4"
+  }
+}
