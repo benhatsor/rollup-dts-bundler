@@ -1,8 +1,6 @@
 /**
  * rollup-dts-bundler
  * @license MIT
- * 
- * See README.md for usage.
  */
 
 import type { Plugin } from 'rollup'
