@@ -25,7 +25,7 @@ export default function dts(): Plugin {
   let entryId: string
 
   return {
-    name: 'api-extractor-dts',
+    name: 'rollup-dts-bundler',
 
     resolveId(source, importer) {
       if (!importer) return null
