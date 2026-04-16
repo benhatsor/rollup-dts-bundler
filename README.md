@@ -1,2 +1,42 @@
 # rollup-dts-bundler
-Rollup plugin for bundling .d.ts declarations via @microsoft/api-extractor.
+Rollup plugin for bundling `.d.ts` declarations via [@microsoft/api-extractor][1].
+
+## Why?
+[@microsoft/api-extractor][1] (Microsoft's official `.d.ts` bundler) produces higher-quality output than most other `.d.ts` bundlers (eg. rollup-plugin-dts, rolldown-plugin-dts, dts-bundle-generator), but is designed as a monolithic CLI tool with verbose config files. This plugin wraps it into a simple Rollup interface.
+
+## Usage
+
+Install the package from `npm`:
+```sh
+npm install --save-dev rollup-dts-bundler
+```
+
+Add it to your `rollup.config.js`:
+```js
+import dts from 'rollup-dts-bundler'
+
+export default [
+  // …
+  {
+    input: 'src/index.ts',
+    output: { file: 'dist/index.d.ts', format: 'es' },
+    plugins: [dts()],
+  }
+]
+```
+
+And then instruct TypeScript where to find your definitions inside your `package.json`:
+```json
+  "types": "dist/index.d.ts",
+```
+
+> Note that the plugin will automatically exclude external libraries (eg. `@types`) from bundling.
+
+## How it works
+The entry point is stubbed out so Rollup only provides the input/output config. All real work happens in `generateBundle`: declarations are emitted via tsc, fed to api-extractor, and the result is output as an asset.
+
+## License
+MIT
+
+
+[1]: https://github.com/microsoft/rushstack/tree/main/apps/api-extractor
