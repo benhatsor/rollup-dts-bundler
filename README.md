@@ -36,7 +36,7 @@ And then instruct TypeScript where to find your definitions inside your `package
 The entry point is stubbed out so Rollup only provides the input/output config. All real work happens in `generateBundle`: declarations are emitted via tsc, fed to api-extractor, and the result is output as an asset.
 
 ## License
-MIT
+[MIT][/LICENSE]
 
 
 [1]: https://github.com/microsoft/rushstack/tree/main/apps/api-extractor
