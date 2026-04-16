@@ -1,27 +1,31 @@
 import { test, expect } from 'vitest'
-import { rollup } from 'rollup'
+import { rollup, type OutputOptions } from 'rollup'
 import { join } from 'node:path'
 import dts from '../src/index.ts'
 
 const fixturesDir = join(import.meta.dirname, 'fixtures')
 
-async function bundle(fixture: string) {
+async function withFixture<T>(fixture: string, fn: () => Promise<T>): Promise<T> {
   const cwd = process.cwd()
-  const fixtureDir = join(fixturesDir, fixture)
-
   try {
-    process.chdir(fixtureDir)
+    process.chdir(join(fixturesDir, fixture))
+    return await fn()
+  } finally {
+    process.chdir(cwd)
+  }
+}
+
+async function bundle(fixture: string, outputOptions: OutputOptions = {}) {
+  return withFixture(fixture, async () => {
     const build = await rollup({
       input: 'src/index.ts',
       plugins: [dts()],
     })
-    const { output } = await build.generate({ format: 'es' })
+    const { output } = await build.generate({ format: 'es', ...outputOptions })
     const asset = output.find(o => o.type === 'asset')
     if (!asset) throw new Error('Expected an asset')
     return asset.source as string
-  } finally {
-    process.chdir(cwd)
-  }
+  })
 }
 
 test('bundles declarations from multiple files into one', async () => {
@@ -74,4 +78,34 @@ test('preserves external library imports', async () => {
 
   // The external interface should NOT be inlined
   expect(output).not.toMatch(/interface ExternalType/)
+})
+
+test('prepends the rollup output banner', async () => {
+  const output = await bundle('basic', { banner: '/* my banner */' })
+
+  expect(output.startsWith('/* my banner */\n')).toBe(true)
+  // And the actual declarations still come through
+  expect(output).toContain('interface Options')
+})
+
+test('errors when given multiple input entry points', async () => {
+  await withFixture('basic', async () => {
+    await expect(
+      rollup({
+        input: ['src/index.ts', 'src/types.ts'],
+        plugins: [dts()],
+      }),
+    ).rejects.toThrow(/single input entry point/)
+  })
+})
+
+test('errors when entry point is not a .ts or .tsx file', async () => {
+  await withFixture('basic', async () => {
+    await expect(
+      rollup({
+        input: 'src/index.js',
+        plugins: [dts()],
+      }),
+    ).rejects.toThrow(/\.ts or \.tsx/)
+  })
 })

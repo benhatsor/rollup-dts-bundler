@@ -1,2 +1,5 @@
 node_modules
 .DS_Store
+
+# Test fixtures bundle their own node_modules so tests work without an install step
+!test/fixtures/**/node_modules
