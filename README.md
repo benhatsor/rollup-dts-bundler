@@ -2,10 +2,10 @@
 
 [![CI][ci-src]][ci-href]
 
-Rollup plugin for bundling `.d.ts` declarations via [@microsoft/api-extractor][1].
+Rollup plugin for bundling `.d.ts` declarations via [@microsoft/api-extractor].
 
 ## Why?
-[@microsoft/api-extractor][1] (Microsoft's official `.d.ts` bundler) produces significantly higher-quality output than most other third-party `.d.ts` bundlers (eg. [rollup-plugin-dts][2], [rolldown-plugin-dts][3], [dts-bundle-generator][4]), but is designed as a monolithic CLI tool with verbose config files. This plugin wraps it into a simple Rollup interface.
+[@microsoft/api-extractor] (Microsoft's official `.d.ts` bundler) produces significantly higher-quality output than most other third-party `.d.ts` bundlers (eg. [rollup-plugin-dts], [rolldown-plugin-dts], [dts-bundle-generator]), but is designed as a monolithic CLI tool with verbose config files. This plugin wraps it into a simple Rollup interface.
 
 ## Usage
 
@@ -56,10 +56,12 @@ The entry point is stubbed out so Rollup only provides the input/output config. 
 [MIT](/LICENSE)
 
 
-[1]: https://github.com/microsoft/rushstack/tree/main/apps/api-extractor
-[2]: https://github.com/Swatinem/rollup-plugin-dts
-[3]: https://github.com/sxzz/rolldown-plugin-dts
-[4]: https://github.com/timocov/dts-bundle-generator
+<!-- References -->
+[@microsoft/api-extractor]: https://github.com/microsoft/rushstack/tree/main/apps/api-extractor
+[rollup-plugin-dts]: https://github.com/Swatinem/rollup-plugin-dts
+[rolldown-plugin-dts]: https://github.com/sxzz/rolldown-plugin-dts
+[dts-bundle-generator]: https://github.com/timocov/dts-bundle-generator
 
+<!-- Badges -->
 [ci-src]: https://github.com/benhatsor/rollup-dts-bundler/actions/workflows/ci.yml/badge.svg
 [ci-href]: https://github.com/benhatsor/rollup-dts-bundler/actions/workflows/ci.yml
