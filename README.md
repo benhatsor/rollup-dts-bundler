@@ -32,10 +32,19 @@ And then instruct TypeScript where to find your definitions inside your `package
 
 > Note that the plugin will automatically exclude external libraries (eg. `@types`) from bundling.
 
-## Notes
-- A single `input` entry point is required. The entry must be a `.ts` or `.tsx` file.
-- The project's `tsconfig.json` is read from the current working directory. There is no API to override it or to customize the underlying api-extractor config.
-- Rollup's `output.banner` option is honoured and prepended to the bundled `.d.ts` output.
+## Options
+```ts
+dts({
+  // Path to tsconfig.json (relative to cwd or absolute).
+  // When omitted, walks up from the entry's directory to find the nearest tsconfig.
+  tsconfig: 'tsconfig.build.json',
+
+  // npm package names whose declarations should be inlined into the output
+  // instead of left as external imports. Useful for re-exporting types from
+  // an internal workspace package.
+  bundledPackages: ['@my-scope/internal-types'],
+})
+```
 
 ## How it works
 The entry point is stubbed out so Rollup only provides the input/output config. All real work happens in `generateBundle`: declarations are emitted via tsc, fed to api-extractor, and the result is output as an asset.
