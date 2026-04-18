@@ -28,7 +28,7 @@ export function collectEntries(ctx: PluginContext, bundle: OutputBundle): Entry[
   })
 }
 
-// With an override, all entries go in one group. Without one, each entry
+// If there's an override, all entries go in one group. Otherwise, each entry
 // walks up from its own directory; entries that land on the same tsconfig
 // end up in the same group and share a TS program downstream.
 export function groupByTsconfig(
@@ -41,8 +41,9 @@ export function groupByTsconfig(
   const groups = new Map<string, Entry[]>()
 
   for (const entry of entries) {
-    // If user defined an override, resolve path relative to cwd.
-    // Otherwise, use TypeScript's native resolver.
+    // If the user defined an override tsconfig path, resolve it relative to cwd.
+    // Otherwise, use TypeScript's native resolver to walk up the tree and find
+    // the `tsconfig.json` closest to the entry.
     const tsconfigPath = override
       ? resolve(cwd, override)
       : ts.findConfigFile(dirname(entry.entryAbsPath), ts.sys.fileExists)

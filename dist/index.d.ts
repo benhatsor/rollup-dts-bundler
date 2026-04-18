@@ -16,7 +16,7 @@ export declare interface DtsOptions {
     tsconfig?: string;
     /**
      * npm package names whose declarations should be inlined into the output
-     * instead of left as external imports — useful for re-exporting types from
+     * instead of left as external imports. Useful for re-exporting types from
      * internal workspace packages.
      */
     bundledPackages?: string[];

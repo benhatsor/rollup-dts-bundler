@@ -48,14 +48,15 @@ function collectEntries(ctx, bundle) {
         return [{ fileName, chunk, entryAbsPath: chunk.facadeModuleId }];
     });
 }
-// With an override, all entries go in one group. Without one, each entry
+// If there's an override, all entries go in one group. Otherwise, each entry
 // walks up from its own directory; entries that land on the same tsconfig
 // end up in the same group and share a TS program downstream.
 function groupByTsconfig(ctx, entries, override, cwd) {
     const groups = new Map();
     for (const entry of entries) {
-        // If user defined an override, resolve path relative to cwd.
-        // Otherwise, use TypeScript's native resolver.
+        // If the user defined an override tsconfig path, resolve it relative to cwd.
+        // Otherwise, use TypeScript's native resolver to walk up the tree and find
+        // the `tsconfig.json` closest to the entry.
         const tsconfigPath = override
             ? resolve(cwd, override)
             : ts.findConfigFile(dirname(entry.entryAbsPath), ts.sys.fileExists);
@@ -76,7 +77,7 @@ function groupByTsconfig(ctx, entries, override, cwd) {
  * api-extractor reads these next, so we emit even on non-fatal diagnostics.
  *
  * Returns each entry paired with its emitted `.d.ts` path, resolved via
- * `ts.getOutputFileNames` (which handles `rootDir`/common-source-directory
+ * `ts.getOutputFileNames` (which handles `rootDir` / common-source-directory
  * rules properly instead of just splicing the path).
  */
 function emitDeclarations(ctx, tsconfigPath, entries, declarationDir, report) {
@@ -106,9 +107,9 @@ function emitDeclarations(ctx, tsconfigPath, entries, declarationDir, report) {
     const program = ts.createProgram(parsed.fileNames, emitOptions);
     const emitResult = program.emit();
     report([...ts.getPreEmitDiagnostics(program), ...emitResult.diagnostics]);
-    // Find where each .d.ts landed using TypeScript's native resolver.
+    // Find where each `.d.ts` landed using TypeScript's native resolver.
     // This is better than just reconstructing the path as the native resolver
-    // also handles rootDir/common-source-directory rules properly.
+    // also handles rootDir / common-source-directory rules properly.
     const emitConfig = { ...parsed, options: emitOptions };
     return entries.map((entry) => {
         const dtsPath = ts
@@ -126,17 +127,16 @@ function emitDeclarations(ctx, tsconfigPath, entries, declarationDir, report) {
  * `buildTasks` builds one `ExtractorConfig` per entry, anchored to the
  * tsconfig's directory.
  *
- * `runExtractors` runs every task in a group sharing one `CompilerState`, so
- * TS parses the sources only once. api-extractor's messages are routed
+ * `runExtractors` runs the input tasks in a group, sharing one `CompilerState`,
+ * so TS parses the sources only once. api-extractor's messages are routed
  * through Rollup's diagnostic channels.
  */
 function buildTasks(ctx, args) {
     // Anchor to the tsconfig's dir so monorepo groups resolve their own
     // package.json, not the one above Rollup's cwd. api-extractor requires one
-    // (see `Collector`), and we use its own `PackageJsonLookup` so resolution
-    // can't diverge — notably, it skips nameless package.json files (e.g. a
-    // monorepo root with only workspace config) that a plain existence check
-    // would stop at.
+    // for invocation (see `Collector`), so we use its own internally-used `PackageJsonLookup`
+    // for identical resolution; notably, it skips nameless package.json files (e.g. a
+    // monorepo root with only workspace config) that a plain existence check would stop at.
     const projectFolder = dirname(args.tsconfigPath);
     // Fresh lookup per call (not module-level) so watch-mode rebuilds don't
     // read a stale cache if the user's package.json layout changes.
@@ -165,7 +165,7 @@ function buildTasks(ctx, args) {
     });
 }
 function runExtractors(ctx, tasks) {
-    // One shared CompilerState across the group so TS parses the sources once.
+    // Use a single shared CompilerState across the group so TS only parses the sources once.
     const [first, ...rest] = tasks;
     const compilerState = CompilerState.create(first.extractorConfig, {
         additionalEntryPoints: rest.map((t) => t.extractorConfig.mainEntryPointFilePath),
@@ -189,7 +189,7 @@ function runExtractors(ctx, tasks) {
 }
 
 /**
- * Pipeline for one Rollup output:
+ * Pipeline for each Rollup output:
  *   1. Make a scratch tempdir inside Rollup's output dir (so TS module
  *      resolution can see the user's `node_modules`).
  *   2. Collect entries from the bundle and group them by tsconfig.
@@ -243,9 +243,9 @@ async function emitBundledAssets(ctx, tasks, bundle, options) {
 }
 
 /**
- * Plugin entry point. The plugin is thin: it marks entry modules, stubs their
- * JS so Rollup emits one chunk per entry, and defers the real work (emit +
- * bundle .d.ts) to `generateBundle` in `./bundle.ts`.
+ * Plugin entry point. The plugin itself is intentionally thin: it marks entry
+ * modules, stubs their JS so Rollup emits one chunk per entry, and defers the
+ * real work (emitting and bundling .d.ts files) to `generateBundle` in `./bundle.ts`.
  */
 function dts(opts = {}) {
     return {

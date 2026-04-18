@@ -1,5 +1,5 @@
 /**
- * Pipeline for one Rollup output:
+ * Pipeline for each Rollup output:
  *   1. Make a scratch tempdir inside Rollup's output dir (so TS module
  *      resolution can see the user's `node_modules`).
  *   2. Collect entries from the bundle and group them by tsconfig.

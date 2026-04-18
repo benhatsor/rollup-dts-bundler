@@ -6,7 +6,7 @@
  * api-extractor reads these next, so we emit even on non-fatal diagnostics.
  *
  * Returns each entry paired with its emitted `.d.ts` path, resolved via
- * `ts.getOutputFileNames` (which handles `rootDir`/common-source-directory
+ * `ts.getOutputFileNames` (which handles `rootDir` / common-source-directory
  * rules properly instead of just splicing the path).
  */
 
@@ -56,9 +56,9 @@ export function emitDeclarations(
   const emitResult = program.emit()
   report([...ts.getPreEmitDiagnostics(program), ...emitResult.diagnostics])
 
-  // Find where each .d.ts landed using TypeScript's native resolver.
+  // Find where each `.d.ts` landed using TypeScript's native resolver.
   // This is better than just reconstructing the path as the native resolver
-  // also handles rootDir/common-source-directory rules properly.
+  // also handles rootDir / common-source-directory rules properly.
   const emitConfig: ts.ParsedCommandLine = { ...parsed, options: emitOptions }
   return entries.map((entry) => {
     const dtsPath = ts

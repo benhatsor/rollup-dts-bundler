@@ -1,7 +1,7 @@
 /**
- * Plugin entry point. The plugin is thin: it marks entry modules, stubs their
- * JS so Rollup emits one chunk per entry, and defers the real work (emit +
- * bundle .d.ts) to `generateBundle` in `./bundle.ts`.
+ * Plugin entry point. The plugin itself is intentionally thin: it marks entry
+ * modules, stubs their JS so Rollup emits one chunk per entry, and defers the
+ * real work (emitting and bundling .d.ts files) to `generateBundle` in `./bundle.ts`.
  */
 
 import type { Plugin } from 'rollup'
@@ -17,7 +17,7 @@ export interface DtsOptions {
 
   /**
    * npm package names whose declarations should be inlined into the output
-   * instead of left as external imports — useful for re-exporting types from
+   * instead of left as external imports. Useful for re-exporting types from
    * internal workspace packages.
    */
   bundledPackages?: string[]

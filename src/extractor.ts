@@ -4,8 +4,8 @@
  * `buildTasks` builds one `ExtractorConfig` per entry, anchored to the
  * tsconfig's directory.
  *
- * `runExtractors` runs every task in a group sharing one `CompilerState`, so
- * TS parses the sources only once. api-extractor's messages are routed
+ * `runExtractors` runs the input tasks in a group, sharing one `CompilerState`,
+ * so TS parses the sources only once. api-extractor's messages are routed
  * through Rollup's diagnostic channels.
  */
 
@@ -34,10 +34,9 @@ export function buildTasks(
 
   // Anchor to the tsconfig's dir so monorepo groups resolve their own
   // package.json, not the one above Rollup's cwd. api-extractor requires one
-  // (see `Collector`), and we use its own `PackageJsonLookup` so resolution
-  // can't diverge — notably, it skips nameless package.json files (e.g. a
-  // monorepo root with only workspace config) that a plain existence check
-  // would stop at.
+  // for invocation (see `Collector`), so we use its own internally-used `PackageJsonLookup`
+  // for identical resolution; notably, it skips nameless package.json files (e.g. a
+  // monorepo root with only workspace config) that a plain existence check would stop at.
   const projectFolder = dirname(args.tsconfigPath)
 
   // Fresh lookup per call (not module-level) so watch-mode rebuilds don't
@@ -75,7 +74,7 @@ export function buildTasks(
 
 export function runExtractors(ctx: PluginContext, tasks: ExtractTask[]): void {
 
-  // One shared CompilerState across the group so TS parses the sources once.
+  // Use a single shared CompilerState across the group so TS only parses the sources once.
   const [first, ...rest] = tasks
   const compilerState = CompilerState.create(first.extractorConfig, {
     additionalEntryPoints: rest.map((t) => t.extractorConfig.mainEntryPointFilePath),
