@@ -14,6 +14,21 @@ jobs:
         with:
           node-version: lts/*
           cache: npm
-      - run: npm ci
-      - run: npm run build
-      - run: npm test
+          
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Run tests
+        run: npm run test
+
+
+# Clear GitHub token permissions
+permissions: {}
+
+# Cancel identical concurrent CI runs
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
