@@ -1,4 +1,7 @@
 # rollup-dts-bundler
+
+[![CI][ci-src]][ci-href]
+
 Rollup plugin for bundling `.d.ts` declarations via [@microsoft/api-extractor][1].
 
 ## Why?
@@ -57,3 +60,6 @@ The entry point is stubbed out so Rollup only provides the input/output config. 
 [2]: https://github.com/Swatinem/rollup-plugin-dts
 [3]: https://github.com/sxzz/rolldown-plugin-dts
 [4]: https://github.com/timocov/dts-bundle-generator
+
+[ci-src]: https://github.com/sxzz/rollup-dts-bundler/actions/workflows/ci.yml/badge.svg
+[ci-badge-href]: https://github.com/sxzz/rollup-dts-bundler/actions/workflows/ci.yml
