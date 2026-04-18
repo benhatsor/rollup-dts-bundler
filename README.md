@@ -61,5 +61,5 @@ The entry point is stubbed out so Rollup only provides the input/output config. 
 [3]: https://github.com/sxzz/rolldown-plugin-dts
 [4]: https://github.com/timocov/dts-bundle-generator
 
-[ci-src]: https://github.com/sxzz/rollup-dts-bundler/actions/workflows/ci.yml/badge.svg
-[ci-badge-href]: https://github.com/sxzz/rollup-dts-bundler/actions/workflows/ci.yml
+[ci-src]: https://github.com/benhatsor/rollup-dts-bundler/actions/workflows/ci.yml/badge.svg
+[ci-badge-href]: https://github.com/benhatsor/rollup-dts-bundler/actions/workflows/ci.yml
