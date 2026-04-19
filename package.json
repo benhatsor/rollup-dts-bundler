@@ -1,14 +1,27 @@
 {
   "name": "rollup-dts-bundler",
+  "type": "module",
   "version": "1.0.0",
   "description": "Rollup plugin for bundling .d.ts declarations via @microsoft/api-extractor.",
-  "author": "Ben Hatsor",
+  "author": "benhatsor",
   "license": "MIT",
+  "homepage": "https://github.com/benhatsor/rollup-dts-bundler#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/benhatsor/rollup-dts-bundler.git"
   },
-  "type": "module",
+  "bugs": {
+    "url": "https://github.com/benhatsor/rollup-dts-bundler/issues"
+  },
+  "keywords": [
+    "rollup",
+    "rolldown",
+    "plugin",
+    "dts",
+    "typescript",
+    "vue",
+    "jsdoc"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -18,10 +31,15 @@
   "files": [
     "dist"
   ],
+  "engines": {
+    "node": ">=24.4.0"
+  },
   "scripts": {
     "build": "rollup -c",
-    "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "release": "bumpp",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
@@ -32,11 +50,21 @@
     "rollup": "^4.0.0",
     "typescript": "^6.0.0"
   },
+  "peerDependenciesMeta": {
+    "rollup": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-typescript": "^12.3.0",
     "@types/node": "^25.6.0",
+    "@vitest/coverage-v8": "^4.1.4",
+    "bumpp": "^11.0.1",
+    "conventional-changelog": "^7.2.0",
+    "conventional-changelog-angular": "^8.3.1",
     "rollup": "^4.60.1",
+    "semantic-release": "^25.0.3",
     "typescript": "^6.0.2",
     "vitest": "^4.1.4"
   }

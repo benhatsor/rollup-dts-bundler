@@ -33,14 +33,30 @@ export function buildTasks(
 ): ExtractTask[] {
 
   // Anchor to the tsconfig's dir so monorepo groups resolve their own
-  // package.json, not the one above Rollup's cwd. api-extractor requires one
-  // for invocation (see `Collector`), so we use its own internally-used `PackageJsonLookup`
-  // for identical resolution; notably, it skips nameless package.json files (e.g. a
-  // monorepo root with only workspace config) that a plain existence check would stop at.
+  // package.json, not the one above Rollup's cwd.
   const projectFolder = dirname(args.tsconfigPath)
 
-  // Fresh lookup per call (not module-level) so watch-mode rebuilds don't
-  // read a stale cache if the user's package.json layout changes.
+  // api-extractor's `Collector` requires the working package's package.json path
+  // and throws otherwise. `loadFileAndPrepare` would auto-resolve it via
+  // `PackageJsonLookup.tryGetPackageJsonFilePathFor` (anchored to an api-extractor
+  // config file), but the programmatic `prepare` we use has no config file to anchor
+  // to — so resolution falls to us. We use the very same `PackageJsonLookup`,
+  // anchoring it to the tsconfig's dir (so monorepo groups resolve their own package.json).
+  // This matches both the aformentioned path lookup, as well as the lookup `Collector` itself
+  // uses internally to classify external source files (when deriving package names for declaration
+  // references). Note that its ancestor walk skips nameless package.json files; a naive walk
+  // (e.g. `find-up`) could stop at a nameless monorepo root and hand `Collector` a path it
+  // would disagree with. Fresh instance per call so watch-mode rebuilds don't read a stale cache.
+  //
+  // Collector requires `packageJsonFullPath`:
+  //   - `ExtractorConfig.prepare` sets `packageFolder` to `dirname(packageJsonFullPath)`: https://github.com/microsoft/rushstack/blob/main/apps/api-extractor/src/api/ExtractorConfig.ts#L867
+  //   - Collector requires `packageFolder`: https://github.com/microsoft/rushstack/blob/68497c5580db64436d7b854ac4135a47bb86deb7/apps/api-extractor/src/collector/Collector.ts#L123-L127
+  // - `ExtractorConfig.loadFileAndPrepare`'s internal `PackageJsonLookup`: https://github.com/microsoft/rushstack/blob/3793e2c87abbf2e4d4545566126d4e133cd7e061/apps/api-extractor/src/api/ExtractorConfig.ts#L604-L606
+  // - Collector's internal `PackageJsonLookup` (used for external sources):
+  //   - Initialized: https://github.com/microsoft/rushstack/blob/68497c5580db64436d7b854ac4135a47bb86deb7/apps/api-extractor/src/collector/Collector.ts#L108
+  //   - Shim invoked: https://github.com/microsoft/rushstack/blob/main/apps/api-extractor/src/generators/DeclarationReferenceGenerator.ts#L356-L357
+  //   - Actual invocation: https://github.com/microsoft/rushstack/blob/main/libraries/node-core-library/src/PackageJsonLookup.ts#L234
+  // - `PackageJsonLookup` skips nameless package.json (walks past MISSING_NAME_FIELD): https://github.com/microsoft/rushstack/blob/68497c5580db64436d7b854ac4135a47bb86deb7/libraries/node-core-library/src/PackageJsonLookup.ts#L385
   const packageJsonFullPath = new PackageJsonLookup().tryGetPackageJsonFilePathFor(projectFolder)
   if (!packageJsonFullPath) {
     ctx.error(`Could not find a named package.json at or above ${projectFolder}`)

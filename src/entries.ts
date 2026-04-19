@@ -1,12 +1,12 @@
 /**
  * Entry discovery and grouping.
  *
- * `collectEntries` pairs each output chunk with the absolute path of its
- * source module so later stages can ask TS where the `.d.ts` landed.
+ * `collectEntries` pairs each output chunk with its source module's absolute path,
+ * so we can later resolve where each chunk's respective emitted `.d.ts` file lands.
  *
- * `groupByTsconfig` splits entries by tsconfig — either the user's override
- * (one group) or each entry's nearest `tsconfig.json`. Entries sharing a
- * tsconfig share a TS program, letting api-extractor reuse one `CompilerState`.
+ * `groupByTsconfig` splits entries by tsconfig — using either the user's
+ * override (a single group) or each entry's nearest `tsconfig.json`. Entries sharing
+ * a tsconfig share a TS program, letting api-extractor reuse a single `CompilerState`.
  */
 
 import type { OutputBundle, OutputChunk, PluginContext } from 'rollup'
@@ -41,9 +41,9 @@ export function groupByTsconfig(
   const groups = new Map<string, Entry[]>()
 
   for (const entry of entries) {
-    // If the user defined an override tsconfig path, resolve it relative to cwd.
-    // Otherwise, use TypeScript's native resolver to walk up the tree and find
-    // the `tsconfig.json` closest to the entry.
+    // If an override was given, resolve it relative to cwd. Otherwise let
+    // TypeScript's own resolver walk up from the entry's directory to the
+    // nearest `tsconfig.json`.
     const tsconfigPath = override
       ? resolve(cwd, override)
       : ts.findConfigFile(dirname(entry.entryAbsPath), ts.sys.fileExists)

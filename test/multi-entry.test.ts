@@ -3,8 +3,8 @@ import { bundle } from './helpers.ts'
 
 test('handles entries resolving to different tsconfigs', async () => {
   // pkg-a and pkg-b each have their own tsconfig; with no override, each
-  // entry must walk up to its own package's tsconfig. If grouping were broken
-  // and one tsconfig were applied to both, the "wrong" tsconfig's `include`
+  // entry must walk up to its own package's tsconfig. If grouping collapsed
+  // both entries under a single tsconfig, the "wrong" tsconfig's `include`
   // wouldn't cover the other entry's sources and emit would fail.
   const result = await bundle('multi-tsconfig', {
     input: {

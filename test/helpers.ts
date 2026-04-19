@@ -2,18 +2,17 @@
  * Shared test helpers.
  */
 
-import { rollup, type InputOption, type OutputOptions, type OutputAsset } from 'rollup'
+import { rollup, type InputOption, type OutputOptions } from 'rollup'
 import { join } from 'node:path'
 import dts, { type DtsOptions } from '../src/index.ts'
 
 const fixturesDir = join(import.meta.dirname, 'fixtures')
 
 /**
- * Runs input `fn` with `process.cwd()` (the current working directory)
- * pointed at the named fixture, restoring cwd afterward, even on error.
- * The plugin resolves tsconfig and `node_modules` relative to cwd,
- * so each fixture is itself a self-contained "project root"
- * and tests must chdir into it before invoking Rollup.
+ * Runs `fn` with the process cwd pointed at the named fixture, restoring the
+ * original cwd afterward (even on error). The plugin resolves tsconfig and
+ * `node_modules` relative to cwd, so each fixture is a self-contained "project
+ * root" and tests must chdir into it before invoking Rollup.
  */
 export async function withFixture<T>(fixture: string, fn: () => Promise<T>): Promise<T> {
   const cwd = process.cwd()
@@ -39,7 +38,7 @@ export interface BundleOpts {
    */
   output?: OutputOptions
   /**
-   * forwarded to `dts(...)`.
+   * Forwarded to `dts(...)`.
    */
   plugin?: DtsOptions
 }

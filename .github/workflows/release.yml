@@ -1,0 +1,61 @@
+name: Release
+
+on:
+  workflow_call:
+    inputs:
+      is-auto:
+        required: true
+        type: boolean
+
+# Queue release jobs
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Fetch full branch/tag history
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.4'
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run tests
+        run: npm test
+
+      # User created tag: Auto-generate changelog and publish
+      - name: Manual release
+        if: ${{ !inputs.is-auto }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          npm publish --provenance --access public
+          npx conventional-changelog -p angular \
+            | gh release create "$GITHUB_REF_NAME" -F -
+
+      # Renovate auto-merged to main: Auto-publish with semantic-release
+      - name: Automatic release
+        if: ${{ inputs.is-auto }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          NPM_CONFIG_PROVENANCE: 'true'
+        run: npx semantic-release

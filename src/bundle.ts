@@ -1,7 +1,7 @@
 /**
  * Pipeline for each Rollup output:
- *   1. Make a scratch tempdir inside Rollup's output dir (so TS module
- *      resolution can see the user's `node_modules`).
+ *   1. Make a scratch tempdir inside Rollup's output dir (so TS can resolve
+ *      imported external modules by walking up to the user's `node_modules`).
  *   2. Collect entries from the bundle and group them by tsconfig.
  *   3. For each group: emit `.d.ts` with `tsc`, bundle with api-extractor,
  *      then swap Rollup's stub JS chunks for the bundled `.d.ts` assets.
@@ -9,12 +9,19 @@
 
 import type { NormalizedOutputOptions, OutputBundle, PluginContext } from 'rollup'
 import { join, dirname } from 'node:path'
-import { mkdirSync, readFileSync, mkdtempDisposableSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync, mkdtempDisposableSync } from 'node:fs'
 import { createReporter } from './diagnostics'
 import { collectEntries, groupByTsconfig } from './entries'
 import { emitDeclarations } from './emit'
 import { buildTasks, runExtractors, type ExtractTask } from './extractor'
 import type { DtsOptions } from './index'
+
+// Standard cache-directory tag (https://bford.info/cachedir/)
+// so backup tools auto-skip crash leftovers.
+const CACHEDIR_TAG =
+  'Signature: 8a477f597d28d172789f06886806bc55\n' +
+  '# This file is a cache directory tag created by rollup-dts-bundler.\n' +
+  '# For information about cache directory tags, see https://bford.info/cachedir/\n'
 
 export async function bundleDeclarations(
   ctx: PluginContext,
@@ -22,18 +29,27 @@ export async function bundleDeclarations(
   options: NormalizedOutputOptions,
   opts: DtsOptions,
 ): Promise<void> {
-  
+
   const cwd = process.cwd()
 
-  // Put the scratch dir inside Rollup's output dir so TS module resolution
-  // can find the user's `node_modules`. Fall back to cwd if the caller used
-  // `rollup().generate()` with neither `output.dir` nor `output.file`.
+  // Scratch dir constraints:
+  //   - Not under `node_modules/`: TS flags any path containing `/node_modules/`
+  //     as `isExternalLibraryImport`, which would make api-extractor misclassify
+  //     our internal modules as third-party.
+  //   - Under the project root: emitted `.d.ts` files import real packages, and
+  //     TS resolution (via api-extractor?) walks up from each scratch file to find `node_modules`.
+  //     `os.tmpdir()` would walk to `/` and miss it.
+  // Fall back to cwd if the caller used `rollup().generate()` with neither
+  // `output.dir` nor `output.file`. `.gitignore` hides crash leftovers from
+  // `git status` (and from `npm publish` via its .gitignore fallback).
+  // `CACHEDIR.TAG` makes backup tools skip them.
   const outputDir =
     options.dir ?? (options.file ? dirname(options.file) : cwd)
-
   mkdirSync(outputDir, { recursive: true })
 
   using tempDir = mkdtempDisposableSync(join(outputDir, '.rollup-dts-bundler-'))
+  writeFileSync(join(tempDir.path, '.gitignore'), '*\n')
+  writeFileSync(join(tempDir.path, 'CACHEDIR.TAG'), CACHEDIR_TAG)
 
   const report = createReporter(ctx, cwd)
   const entries = collectEntries(ctx, bundle)
