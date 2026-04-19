@@ -7,7 +7,8 @@ on:
   workflow_dispatch:
 
 # Clear GitHub token permissions
-permissions: {}
+permissions:
+  contents: read
 
 # Cancel identical concurrent CI runs
 concurrency:
