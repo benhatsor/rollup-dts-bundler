@@ -243,13 +243,12 @@ async function bundleDeclarations(ctx, bundle, options, opts) {
     //     as `isExternalLibraryImport`, which would make api-extractor misclassify
     //     our internal modules as third-party.
     //   - Under the project root: emitted `.d.ts` files import real packages, and
-    //     TS resolution walks up from each scratch file to find `node_modules`.
+    //     TS resolution (via api-extractor?) walks up from each scratch file to find `node_modules`.
     //     `os.tmpdir()` would walk to `/` and miss it.
-    // Output dir over cwd: typically already gitignored, guaranteed writable, and
-    // doesn't litter the project root. Fall back to cwd if the caller used
-    // `rollup().generate()` with neither `output.dir` nor `output.file`.
-    // `.gitignore` hides crash leftovers from `git status` (and from `npm publish`
-    // via its .gitignore fallback). `CACHEDIR.TAG` makes backup tools skip them.
+    // Fall back to cwd if the caller used `rollup().generate()` with neither
+    // `output.dir` nor `output.file`. `.gitignore` hides crash leftovers from
+    // `git status` (and from `npm publish` via its .gitignore fallback).
+    // `CACHEDIR.TAG` makes backup tools skip them.
     const outputDir = options.dir ?? (options.file ? dirname(options.file) : cwd);
     mkdirSync(outputDir, { recursive: true });
     using tempDir = mkdtempDisposableSync(join(outputDir, '.rollup-dts-bundler-'));
