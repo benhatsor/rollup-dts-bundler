@@ -28,8 +28,8 @@ export default function dts(opts: DtsOptions = {}): Plugin {
     name: 'rollup-dts-bundler',
 
     resolveId(source, importer) {
-      // Defer entries to Rollup's default resolver (by returning null) so we
-      // get an absolute `facadeModuleId` later to map back to the emitted .d.ts.
+      // For entries, return null so Rollup's default resolver gives us an
+      // absolute `facadeModuleId` later to map back to the emitted .d.ts.
       if (!importer) {
         if (!/\.tsx?$/.test(source)) {
           this.error(`Entry point must be a .ts or .tsx file, got: ${source}`)
