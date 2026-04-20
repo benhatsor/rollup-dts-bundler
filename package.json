@@ -32,7 +32,7 @@
     "dist"
   ],
   "engines": {
-    "node": ">=24.4.0"
+    "node": ">=24.10.0"
   },
   "scripts": {
     "build": "rollup -c",
