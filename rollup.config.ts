@@ -1,7 +1,7 @@
 import { defineConfig } from 'rollup'
 import typescript from '@rollup/plugin-typescript'
 import nodeResolve from '@rollup/plugin-node-resolve'
-import dts from './dist/index.js'
+import dts from './src/index'
 
 const banner = `
 /**
