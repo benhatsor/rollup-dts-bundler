@@ -1,12 +1,14 @@
 /**
- * Entry discovery and grouping.
+ * Entry discovery and grouping, run before `emitDeclarations` / `buildTasks`.
  *
- * `collectEntries` pairs each output chunk with its source module's absolute path,
- * so we can later resolve where each chunk's respective emitted `.d.ts` file lands.
+ * `collectEntries` walks Rollup's output bundle and pairs each chunk with its
+ * source module's absolute path; `emitDeclarations` later uses that path to map
+ * emitted `.d.ts` files back to their chunk.
  *
- * `groupByTsconfig` splits entries by tsconfig — using either the user's
- * override (a single group) or each entry's nearest `tsconfig.json`. Entries sharing
- * a tsconfig share a TS program, letting api-extractor reuse a single `CompilerState`.
+ * `groupByTsconfig` splits entries by tsconfig — either the user's override
+ * (one group covering all entries) or each entry's nearest `tsconfig.json`.
+ * Entries sharing a tsconfig later share a TS program downstream,
+ * letting api-extractor reuse a single `CompilerState`.
  */
 
 import type { OutputBundle, OutputChunk, PluginContext } from 'rollup'

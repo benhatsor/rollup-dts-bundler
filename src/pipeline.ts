@@ -17,7 +17,7 @@ import { buildTasks, runExtractors, type ExtractTask } from './extractor'
 import type { DtsOptions } from './index'
 
 // Standard cache-directory tag (https://bford.info/cachedir/)
-// so backup tools auto-skip crash leftovers.
+// so backup tools auto-skip leftovers.
 const CACHEDIR_TAG =
   'Signature: 8a477f597d28d172789f06886806bc55\n' +
   '# This file is a cache directory tag created by rollup-dts-bundler.\n' +
@@ -32,23 +32,38 @@ export async function bundleDeclarations(
 
   const cwd = process.cwd()
 
-  // Scratch dir constraints:
-  //   - Not under `node_modules/`: TS flags any path containing `/node_modules/`
-  //     as `isExternalLibraryImport`, which would make api-extractor misclassify
-  //     our internal modules as third-party.
-  //   - Under the project root: emitted `.d.ts` files import real packages, and
-  //     TS resolution (via api-extractor?) walks up from each scratch file to find `node_modules`.
-  //     `os.tmpdir()` would walk to `/` and miss it.
-  // Fall back to cwd if the caller used `rollup().generate()` with neither
-  // `output.dir` nor `output.file`. `.gitignore` hides crash leftovers from
-  // `git status` (and from `npm publish` via its .gitignore fallback).
-  // `CACHEDIR.TAG` makes backup tools skip them.
+  // - Scratch (temp) dir can't be under `node_modules/`, as TS flags any path
+  //   containing `/node_modules/` as `isExternalLibraryImport`, which would
+  //   make api-extractor misclassify our internal modules as third-party.
+  // - Scratch dir must be under the project root, as emitted `.d.ts` files import
+  //   real packages, and TS resolution (via api-extractor) walks up the file tree
+  //   from each scratch file to find `node_modules`. `os.tmpdir()` would walk up
+  //   to `/` and wouldn't find it.
+  // As such, we've opted to put the scratch directory in rollup's output directory,
+  // falling back to cwd if the caller used `rollup().generate()` with neither
+  // `output.dir` nor `output.file`. `.gitignore` hides crash leftovers from Git
+  // and `CACHEDIR.TAG` makes backup tools skip them.
+  //
+  // `isExternalLibraryImport` check:
+  // - api-extractor uses TS's `resolvedModule.isExternalLibraryImport` to mark external modules:
+  //   https://github.com/microsoft/rushstack/blob/488875fdd2027136bba2e72d0930136b0cab0324/apps/api-extractor/src/analyzer/ExportAnalyzer.ts#L312
+  // - TS's `tryResolve` sets `isExternalLibraryImport` to `pathContainsNodeModules(resolved.path)`
+  //   on a local `SearchResult`: https://github.com/microsoft/TypeScript/blob/55423abe4d029017f19b6e4c32097591994836b4/src/compiler/moduleNameResolver.ts#L1917
+  // - `createResolvedModuleWithFailedLookupLocations` then copies that flag onto the public
+  //   `resolvedModule.isExternalLibraryImport` field: https://github.com/microsoft/TypeScript/blob/55423abe4d029017f19b6e4c32097591994836b4/src/compiler/moduleNameResolver.ts#L290
+  //
+  // `node_modules` walk-up:
+  // - api-extractor invokes TS module resolution via `getResolvedModule`, passing the importing source file:
+  //   https://github.com/microsoft/rushstack/blob/488875fdd2027136bba2e72d0930136b0cab0324/apps/api-extractor/src/analyzer/ExportAnalyzer.ts#L283
+  // - TS's `loadModuleFromNearestNodeModulesDirectoryWorker` walks ancestor directories from the containing file
+  //   via `forEachAncestorDirectoryStoppingAtGlobalCache`:
+  //   https://github.com/microsoft/TypeScript/blob/55423abe4d029017f19b6e4c32097591994836b4/src/compiler/moduleNameResolver.ts#L3029
   const outputDir =
     options.dir ?? (options.file ? dirname(options.file) : cwd)
   mkdirSync(outputDir, { recursive: true })
 
   using tempDir = mkdtempDisposableSync(join(outputDir, '.rollup-dts-bundler-'))
-  writeFileSync(join(tempDir.path, '.gitignore'), '*\n')
+  writeFileSync(join(tempDir.path, '.gitignore'), '*')
   writeFileSync(join(tempDir.path, 'CACHEDIR.TAG'), CACHEDIR_TAG)
 
   const report = createReporter(ctx, cwd)

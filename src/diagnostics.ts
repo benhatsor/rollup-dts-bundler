@@ -1,7 +1,8 @@
 /**
  * Formats TS diagnostics with color + source context and routes them through
  * Rollup's `ctx.warn` / `ctx.error` so they appear in Rollup's normal output
- * instead of TS writing straight to stdout.
+ * instead of TS writing straight to stdout. Used by `emitDeclarations` to
+ * report errors raised during `.d.ts` emit.
  */
 
 import ts from 'typescript'

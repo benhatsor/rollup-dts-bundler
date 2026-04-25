@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+    branches: [main]
   workflow_dispatch:
 
 # Clear GitHub token permissions
@@ -30,13 +31,16 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --engine-strict # Fail on dep min node version mismatch
 
       - name: Typecheck
         run: npm run typecheck
 
+      # Ensure build succeeds
       - name: Build
         run: npm run build
 
+      # Run tests and see if coverage changed
+      # (maintainer diagnostic to prevent test regression)
       - name: Run tests with coverage
         run: npm run test:coverage

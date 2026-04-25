@@ -1,13 +1,12 @@
 /**
- * Declaration emit for a tsconfig group.
- *
- * Loads the tsconfig (resolving `extends`), forces emit-friendly options, and
- * runs `program.emit()` to drop `.d.ts` files into the group's scratch dir
+ * Declaration emit for one group of Rollup entries sharing a tsconfig. Loads
+ * the tsconfig (resolving `extends`), forces emit-friendly options, and runs
+ * `program.emit()` to drop `.d.ts` files into the group's scratch dir, ready
  * for api-extractor to consume.
  *
  * Returns each entry paired with its emitted `.d.ts` path, resolved via
- * `ts.getOutputFileNames` (which handles `rootDir` / common-source-directory
- * rules properly instead of just splicing the path).
+ * `ts.getOutputFileNames` so `rootDir` / common-source-directory rules are
+ * honored instead of just splicing the path.
  */
 
 import ts from 'typescript'
@@ -64,20 +63,20 @@ export function emitDeclarations(
     // to internally when `rootDir` is unset — preserving the layout TS would
     // have produced without our `declarationDir` override.
     //
-    // - TS5011 enforcement: https://github.com/microsoft/TypeScript/blob/050880ce59e30b356b686bd3144efe24f875ebc8/src/compiler/program.ts#L4262-L4289
-    // - TS6059 (`rootDir` constraint): https://github.com/microsoft/TypeScript/blob/050880ce59e30b356b686bd3144efe24f875ebc8/src/compiler/program.ts#L3978-L3997
-    // - `getCommonSourceDirectory` uses `rootDir` when set, else `dirname(configFilePath)`: https://github.com/microsoft/TypeScript/blob/050880ce59e30b356b686bd3144efe24f875ebc8/src/compiler/emitter.ts#L644-L652
+    // TS5011 enforcement: https://github.com/microsoft/TypeScript/blob/050880ce59e30b356b686bd3144efe24f875ebc8/src/compiler/program.ts#L4262-L4289
+    // TS6059 (`rootDir` constraint): https://github.com/microsoft/TypeScript/blob/050880ce59e30b356b686bd3144efe24f875ebc8/src/compiler/program.ts#L3978-L3997
+    // `getCommonSourceDirectory` uses `rootDir` when set, else `dirname(configFilePath)`: https://github.com/microsoft/TypeScript/blob/050880ce59e30b356b686bd3144efe24f875ebc8/src/compiler/emitter.ts#L644-L652
     rootDir: parsed.options.rootDir ?? dirname(tsconfigPath),
   }
   const program = ts.createProgram(parsed.fileNames, emitOptions)
   const emitResult = program.emit()
   report([...ts.getPreEmitDiagnostics(program), ...emitResult.diagnostics])
 
-  // Use TS's native resolver to find where each `.d.ts` landed, rather than
-  // reconstructing the path ourselves — the resolver correctly applies
-  // `rootDir` and common-source-directory rules.
+  // Use TS's native resolver (`ts.getOutputFileNames`) to find where each
+  // `.d.ts` landed, rather than reconstructing the path ourselves
+  // (the resolver applies `rootDir` and common-source-directory rules properly).
   //
-  // See `ts.getOutputFileNames`: https://github.com/microsoft/TypeScript/blob/050880ce59e30b356b686bd3144efe24f875ebc8/src/compiler/emitter.ts#L710
+  // `ts.getOutputFileNames`: https://github.com/microsoft/TypeScript/blob/050880ce59e30b356b686bd3144efe24f875ebc8/src/compiler/emitter.ts#L710
   const emitConfig: ts.ParsedCommandLine = { ...parsed, options: emitOptions }
   return entries.map((entry) => {
     const dtsPath = ts

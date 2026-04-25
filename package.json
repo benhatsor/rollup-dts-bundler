@@ -36,11 +36,11 @@
   },
   "scripts": {
     "build": "rollup -c",
+    "dev": "rollup -c --watch",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
-    "release": "bumpp",
-    "prepublishOnly": "npm run build"
+    "release": "bumpp"
   },
   "dependencies": {
     "@microsoft/api-extractor": "^7.58.2",

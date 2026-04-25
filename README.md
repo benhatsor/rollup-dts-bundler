@@ -51,7 +51,7 @@ dts({
 ```
 
 ## How it works
-The entry point is stubbed out so Rollup only provides the input/output config. All real work happens in `generateBundle`: declarations are emitted via tsc, fed to api-extractor, and the result is output as an asset.
+The entry point is stubbed out so Rollup only provides the input/output config. All real work happens in the `generateBundle` hook: declarations are emitted via tsc, fed to api-extractor, and the result is output as an asset.
 
 ## License
 [MIT](/LICENSE)

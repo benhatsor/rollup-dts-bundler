@@ -11,7 +11,8 @@ import { PackageJsonLookup } from '@rushstack/node-core-library';
 /**
  * Formats TS diagnostics with color + source context and routes them through
  * Rollup's `ctx.warn` / `ctx.error` so they appear in Rollup's normal output
- * instead of TS writing straight to stdout.
+ * instead of TS writing straight to stdout. Used by `emitDeclarations` to
+ * report errors raised during `.d.ts` emit.
  */
 function createReporter(ctx, cwd) {
     const formatHost = {
@@ -30,14 +31,16 @@ function createReporter(ctx, cwd) {
 }
 
 /**
- * Entry discovery and grouping.
+ * Entry discovery and grouping, run before `emitDeclarations` / `buildTasks`.
  *
- * `collectEntries` pairs each output chunk with its source module's absolute path,
- * so we can later resolve where each chunk's respective emitted `.d.ts` file lands.
+ * `collectEntries` walks Rollup's output bundle and pairs each chunk with its
+ * source module's absolute path; downstream uses that path to map emitted
+ * `.d.ts` files back to their chunk.
  *
- * `groupByTsconfig` splits entries by tsconfig — using either the user's
- * override (a single group) or each entry's nearest `tsconfig.json`. Entries sharing
- * a tsconfig share a TS program, letting api-extractor reuse a single `CompilerState`.
+ * `groupByTsconfig` splits entries by tsconfig — either the user's override
+ * (one group covering all entries) or each entry's nearest `tsconfig.json`.
+ * Entries sharing a tsconfig share a TS program downstream, letting
+ * api-extractor reuse a single `CompilerState`.
  */
 function collectEntries(ctx, bundle) {
     return Object.entries(bundle).flatMap(([fileName, chunk]) => {
@@ -70,15 +73,14 @@ function groupByTsconfig(ctx, entries, override, cwd) {
 }
 
 /**
- * Declaration emit for a tsconfig group.
- *
- * Loads the tsconfig (resolving `extends`), forces emit-friendly options, and
- * runs `program.emit()` to drop `.d.ts` files into the group's scratch dir
+ * Declaration emit for one group of Rollup entries sharing a tsconfig. Loads
+ * the tsconfig (resolving `extends`), forces emit-friendly options, and runs
+ * `program.emit()` to drop `.d.ts` files into the group's scratch dir, ready
  * for api-extractor to consume.
  *
  * Returns each entry paired with its emitted `.d.ts` path, resolved via
- * `ts.getOutputFileNames` (which handles `rootDir` / common-source-directory
- * rules properly instead of just splicing the path).
+ * `ts.getOutputFileNames` so `rootDir` / common-source-directory rules are
+ * honored instead of just splicing the path.
  */
 function emitDeclarations(ctx, tsconfigPath, entries, declarationDir, report) {
     // Use `getParsedCommandLineOfConfigFile` so `extends` chains are resolved.
@@ -116,19 +118,19 @@ function emitDeclarations(ctx, tsconfigPath, entries, declarationDir, report) {
         // to internally when `rootDir` is unset — preserving the layout TS would
         // have produced without our `declarationDir` override.
         //
-        // - TS5011 enforcement: https://github.com/microsoft/TypeScript/blob/050880ce59e30b356b686bd3144efe24f875ebc8/src/compiler/program.ts#L4262-L4289
-        // - TS6059 (`rootDir` constraint): https://github.com/microsoft/TypeScript/blob/050880ce59e30b356b686bd3144efe24f875ebc8/src/compiler/program.ts#L3978-L3997
-        // - `getCommonSourceDirectory` uses `rootDir` when set, else `dirname(configFilePath)`: https://github.com/microsoft/TypeScript/blob/050880ce59e30b356b686bd3144efe24f875ebc8/src/compiler/emitter.ts#L644-L652
+        // TS5011 enforcement: https://github.com/microsoft/TypeScript/blob/050880ce59e30b356b686bd3144efe24f875ebc8/src/compiler/program.ts#L4262-L4289
+        // TS6059 (`rootDir` constraint): https://github.com/microsoft/TypeScript/blob/050880ce59e30b356b686bd3144efe24f875ebc8/src/compiler/program.ts#L3978-L3997
+        // `getCommonSourceDirectory` uses `rootDir` when set, else `dirname(configFilePath)`: https://github.com/microsoft/TypeScript/blob/050880ce59e30b356b686bd3144efe24f875ebc8/src/compiler/emitter.ts#L644-L652
         rootDir: parsed.options.rootDir ?? dirname(tsconfigPath),
     };
     const program = ts.createProgram(parsed.fileNames, emitOptions);
     const emitResult = program.emit();
     report([...ts.getPreEmitDiagnostics(program), ...emitResult.diagnostics]);
-    // Use TS's native resolver to find where each `.d.ts` landed, rather than
-    // reconstructing the path ourselves — the resolver correctly applies
-    // `rootDir` and common-source-directory rules.
+    // Use TS's native resolver (`ts.getOutputFileNames`) to find where each
+    // `.d.ts` landed, rather than reconstructing the path ourselves
+    // (the resolver applies `rootDir` and common-source-directory rules properly).
     //
-    // See `ts.getOutputFileNames`: https://github.com/microsoft/TypeScript/blob/050880ce59e30b356b686bd3144efe24f875ebc8/src/compiler/emitter.ts#L710
+    // `ts.getOutputFileNames`: https://github.com/microsoft/TypeScript/blob/050880ce59e30b356b686bd3144efe24f875ebc8/src/compiler/emitter.ts#L710
     const emitConfig = { ...parsed, options: emitOptions };
     return entries.map((entry) => {
         const dtsPath = ts
@@ -141,49 +143,46 @@ function emitDeclarations(ctx, tsconfigPath, entries, declarationDir, report) {
 }
 
 /**
- * api-extractor task construction and invocation.
+ * api-extractor task construction and invocation. Invoked once per group of
+ * Rollup entries sharing a tsconfig, after `emitDeclarations` has produced a
+ * `.d.ts` for each.
  *
- * `buildTasks` builds one `ExtractorConfig` per entry, anchored to the
- * tsconfig's directory.
- *
- * `runExtractors` runs the input tasks in a group, sharing one `CompilerState`,
- * so TS parses the sources only once. api-extractor's messages are routed
- * through Rollup's diagnostic channels.
+ * `buildTasks` builds one task per emitted entry. `runExtractors`
+ * runs those tasks together, sharing one `CompilerState` so TS parses the
+ * sources once. It also routes api-extractor's messages through Rollup's
+ * diagnostic channels.
  */
 function buildTasks(ctx, args) {
-    // Anchor to the tsconfig's dir so monorepo groups resolve their own
-    // package.json, not the one above Rollup's cwd.
-    const projectFolder = dirname(args.tsconfigPath);
-    // api-extractor's `Collector` requires the working package's package.json path
-    // and throws otherwise. `loadFileAndPrepare` would auto-resolve it via
-    // `PackageJsonLookup.tryGetPackageJsonFilePathFor` (anchored to an api-extractor
-    // config file), but the programmatic `prepare` we use has no config file to anchor
-    // to — so resolution falls to us. We use the very same `PackageJsonLookup`,
-    // anchoring it to the tsconfig's dir (so monorepo groups resolve their own package.json).
-    // This matches both the aformentioned path lookup, as well as the lookup `Collector` itself
-    // uses internally to classify external source files (when deriving package names for declaration
-    // references). Note that its ancestor walk skips nameless package.json files; a naive walk
-    // (e.g. `find-up`) could stop at a nameless monorepo root and hand `Collector` a path it
-    // would disagree with. Fresh instance per call so watch-mode rebuilds don't read a stale cache.
+    // `ExtractorConfig.prepare` requires a `packageJsonFullPath` purely as an API artifact:
+    // `Collector` throws if `packageFolder`/`packageJson` are unset, with a standing TODO to
+    // lift the requirement. Since we invoke `prepare` programmatically (no api-extractor
+    // config file to anchor a lookup off of), the resolution falls to us — and the choice
+    // matters: the `packageJson.name` we resolve becomes `workingPackage.name`, which
+    // `DeclarationReferenceGenerator` stamps onto every internal symbol. So we anchor per
+    // entry, not per group; the wrong package would mislabel them — observable only via
+    // TSDoc `{@link pkg!Symbol}` resolution given our disabled reports, but still wrong.
     //
-    // Collector requires `packageJsonFullPath`:
-    //   - `ExtractorConfig.prepare` sets `packageFolder` to `dirname(packageJsonFullPath)`: https://github.com/microsoft/rushstack/blob/main/apps/api-extractor/src/api/ExtractorConfig.ts#L867
-    //   - Collector requires `packageFolder`: https://github.com/microsoft/rushstack/blob/68497c5580db64436d7b854ac4135a47bb86deb7/apps/api-extractor/src/collector/Collector.ts#L123-L127
-    // - `ExtractorConfig.loadFileAndPrepare`'s internal `PackageJsonLookup`: https://github.com/microsoft/rushstack/blob/3793e2c87abbf2e4d4545566126d4e133cd7e061/apps/api-extractor/src/api/ExtractorConfig.ts#L604-L606
-    // - Collector's internal `PackageJsonLookup` (used for external sources):
-    //   - Initialized: https://github.com/microsoft/rushstack/blob/68497c5580db64436d7b854ac4135a47bb86deb7/apps/api-extractor/src/collector/Collector.ts#L108
-    //   - Shim invoked: https://github.com/microsoft/rushstack/blob/main/apps/api-extractor/src/generators/DeclarationReferenceGenerator.ts#L356-L357
-    //   - Actual invocation: https://github.com/microsoft/rushstack/blob/main/libraries/node-core-library/src/PackageJsonLookup.ts#L234
-    // - `PackageJsonLookup` skips nameless package.json (walks past MISSING_NAME_FIELD): https://github.com/microsoft/rushstack/blob/68497c5580db64436d7b854ac4135a47bb86deb7/libraries/node-core-library/src/PackageJsonLookup.ts#L385
-    const packageJsonFullPath = new PackageJsonLookup().tryGetPackageJsonFilePathFor(projectFolder);
-    if (!packageJsonFullPath) {
-        ctx.error(`Could not find a named package.json at or above ${projectFolder}`);
-    }
+    // `PackageJsonLookup` (rather than a generic find-up) skips nameless `package.json` files;
+    // monorepo roots are often intentionally nameless, and stopping at one would make
+    // `prepare` throw `MISSING_NAME_FIELD`. One instance per call: the cache amortizes across
+    // entries, and a fresh instance avoids stale reads in watch mode.
+    //
+    // - Collector throws without `packageFolder` + `packageJson` (with a TODO to lift it): https://github.com/microsoft/rushstack/blob/68497c5580db64436d7b854ac4135a47bb86deb7/apps/api-extractor/src/collector/Collector.ts#L123-L127
+    // - `ExtractorConfig.prepare` derives both from `packageJsonFullPath`: https://github.com/microsoft/rushstack/blob/68497c5580db64436d7b854ac4135a47bb86deb7/apps/api-extractor/src/api/ExtractorConfig.ts#L851-L867
+    // - `DeclarationReferenceGenerator` tags internal source files with `workingPackage.name`: https://github.com/microsoft/rushstack/blob/68497c5580db64436d7b854ac4135a47bb86deb7/apps/api-extractor/src/generators/DeclarationReferenceGenerator.ts#L364
+    // - `PackageJsonLookup` walks past nameless `package.json`: https://github.com/microsoft/rushstack/blob/68497c5580db64436d7b854ac4135a47bb86deb7/libraries/node-core-library/src/PackageJsonLookup.ts#L385
+    // - `loadNodePackageJson` throws `MISSING_NAME_FIELD` on a nameless `package.json`: https://github.com/microsoft/rushstack/blob/68497c5580db64436d7b854ac4135a47bb86deb7/libraries/node-core-library/src/PackageJsonLookup.ts#L290-L292
+    const packageJsonLookup = new PackageJsonLookup();
     return args.emitted.map(({ entry, dtsPath }) => {
+        const entryDir = dirname(entry.entryAbsPath);
+        const packageJsonFullPath = packageJsonLookup.tryGetPackageJsonFilePathFor(entryDir);
+        if (!packageJsonFullPath) {
+            ctx.error(`Could not find a named package.json at or above ${entryDir}`);
+        }
         const bundledDtsPath = join(args.groupDir, `bundled-${entry.fileName.replace(/[/\\]/g, '_')}`);
         const extractorConfig = ExtractorConfig.prepare({
             configObject: {
-                projectFolder,
+                projectFolder: dirname(packageJsonFullPath),
                 mainEntryPointFilePath: dtsPath,
                 bundledPackages: args.bundledPackages,
                 compiler: { tsconfigFilePath: args.tsconfigPath },
@@ -232,27 +231,42 @@ function runExtractors(ctx, tasks) {
  *      then swap Rollup's stub JS chunks for the bundled `.d.ts` assets.
  */
 // Standard cache-directory tag (https://bford.info/cachedir/)
-// so backup tools auto-skip crash leftovers.
+// so backup tools auto-skip leftovers.
 const CACHEDIR_TAG = 'Signature: 8a477f597d28d172789f06886806bc55\n' +
     '# This file is a cache directory tag created by rollup-dts-bundler.\n' +
     '# For information about cache directory tags, see https://bford.info/cachedir/\n';
 async function bundleDeclarations(ctx, bundle, options, opts) {
     const cwd = process.cwd();
-    // Scratch dir constraints:
-    //   - Not under `node_modules/`: TS flags any path containing `/node_modules/`
-    //     as `isExternalLibraryImport`, which would make api-extractor misclassify
-    //     our internal modules as third-party.
-    //   - Under the project root: emitted `.d.ts` files import real packages, and
-    //     TS resolution (via api-extractor?) walks up from each scratch file to find `node_modules`.
-    //     `os.tmpdir()` would walk to `/` and miss it.
-    // Fall back to cwd if the caller used `rollup().generate()` with neither
-    // `output.dir` nor `output.file`. `.gitignore` hides crash leftovers from
-    // `git status` (and from `npm publish` via its .gitignore fallback).
-    // `CACHEDIR.TAG` makes backup tools skip them.
+    // - Scratch (temp) dir can't be under `node_modules/`, as TS flags any path
+    //   containing `/node_modules/` as `isExternalLibraryImport`, which would
+    //   make api-extractor misclassify our internal modules as third-party.
+    // - Scratch dir must be under the project root, as emitted `.d.ts` files import
+    //   real packages, and TS resolution (via api-extractor) walks up the file tree
+    //   from each scratch file to find `node_modules`. `os.tmpdir()` would walk up
+    //   to `/` and wouldn't find it.
+    // As such, we've opted to put the scratch directory in rollup's output directory,
+    // falling back to cwd if the caller used `rollup().generate()` with neither
+    // `output.dir` nor `output.file`. `.gitignore` hides crash leftovers from Git
+    // and `CACHEDIR.TAG` makes backup tools skip them.
+    //
+    // `isExternalLibraryImport` check:
+    // - api-extractor uses TS's `resolvedModule.isExternalLibraryImport` to mark external modules:
+    //   https://github.com/microsoft/rushstack/blob/488875fdd2027136bba2e72d0930136b0cab0324/apps/api-extractor/src/analyzer/ExportAnalyzer.ts#L312
+    // - TS's `tryResolve` sets `isExternalLibraryImport` to `pathContainsNodeModules(resolved.path)`
+    //   on a local `SearchResult`: https://github.com/microsoft/TypeScript/blob/55423abe4d029017f19b6e4c32097591994836b4/src/compiler/moduleNameResolver.ts#L1917
+    // - `createResolvedModuleWithFailedLookupLocations` then copies that flag onto the public
+    //   `resolvedModule.isExternalLibraryImport` field: https://github.com/microsoft/TypeScript/blob/55423abe4d029017f19b6e4c32097591994836b4/src/compiler/moduleNameResolver.ts#L290
+    //
+    // `node_modules` walk-up:
+    // - api-extractor invokes TS module resolution via `getResolvedModule`, passing the importing source file:
+    //   https://github.com/microsoft/rushstack/blob/488875fdd2027136bba2e72d0930136b0cab0324/apps/api-extractor/src/analyzer/ExportAnalyzer.ts#L283
+    // - TS's `loadModuleFromNearestNodeModulesDirectoryWorker` walks ancestor directories from the containing file
+    //   via `forEachAncestorDirectoryStoppingAtGlobalCache`:
+    //   https://github.com/microsoft/TypeScript/blob/55423abe4d029017f19b6e4c32097591994836b4/src/compiler/moduleNameResolver.ts#L3029
     const outputDir = options.dir ?? (options.file ? dirname(options.file) : cwd);
     mkdirSync(outputDir, { recursive: true });
     using tempDir = mkdtempDisposableSync(join(outputDir, '.rollup-dts-bundler-'));
-    writeFileSync(join(tempDir.path, '.gitignore'), '*\n');
+    writeFileSync(join(tempDir.path, '.gitignore'), '*');
     writeFileSync(join(tempDir.path, 'CACHEDIR.TAG'), CACHEDIR_TAG);
     const report = createReporter(ctx, cwd);
     const entries = collectEntries(ctx, bundle);
@@ -295,14 +309,15 @@ async function emitBundledAssets(ctx, tasks, bundle, options) {
 /**
  * Plugin entry point. The plugin itself is intentionally thin: it marks entry
  * modules, stubs their JS so Rollup emits one chunk per entry, and defers the
- * real work (emitting and bundling .d.ts files) to `generateBundle` in `./bundle.ts`.
+ * real work (emitting and bundling .d.ts files) to the `generateBundle` hook,
+ * calling `./pipeline.ts`'s `bundleDeclarations`.
  */
 function dts(opts = {}) {
     return {
         name: 'rollup-dts-bundler',
         resolveId(source, importer) {
-            // Defer entries to Rollup's default resolver (by returning null) so we
-            // get an absolute `facadeModuleId` later to map back to the emitted .d.ts.
+            // For entries, return null so Rollup's default resolver gives us an
+            // absolute `facadeModuleId` later to map back to the emitted .d.ts.
             if (!importer) {
                 if (!/\.tsx?$/.test(source)) {
                     this.error(`Entry point must be a .ts or .tsx file, got: ${source}`);

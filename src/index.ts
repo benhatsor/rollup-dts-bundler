@@ -1,11 +1,12 @@
 /**
  * Plugin entry point. The plugin itself is intentionally thin: it marks entry
  * modules, stubs their JS so Rollup emits one chunk per entry, and defers the
- * real work (emitting and bundling .d.ts files) to `generateBundle` in `./bundle.ts`.
+ * real work (emitting and bundling .d.ts files) to the `generateBundle` hook,
+ * calling `./pipeline.ts`'s `bundleDeclarations`.
  */
 
 import type { Plugin } from 'rollup'
-import { bundleDeclarations } from './bundle'
+import { bundleDeclarations } from './pipeline'
 
 export interface DtsOptions {
   /**

@@ -27,7 +27,7 @@ Coverage thresholds are enforced in [`vitest.config.ts`](vitest.config.ts):
 | Functions | 95% |
 | Lines | 95% |
 
-Falling below any threshold exits non-zero and turns CI/release red.
+Falling below any threshold exits non-zero and turns CI/release red. Thresholds sit just below current values — high enough to catch regressions, low enough to avoid false alarms. Only raise them when every existing file would still pass.
 
 ## CI — [`ci.yml`](.github/workflows/ci.yml)
 

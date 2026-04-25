@@ -1,11 +1,11 @@
 /**
- * api-extractor task construction and invocation.
+ * api-extractor task construction and invocation. Invoked once per group of
+ * Rollup entries sharing a tsconfig, after `emitDeclarations` has produced a
+ * `.d.ts` for each.
  *
- * `buildTasks` builds one `ExtractorConfig` per entry, anchored to the
- * tsconfig's directory.
- *
- * `runExtractors` runs the input tasks in a group, sharing one `CompilerState`,
- * so TS parses the sources only once. api-extractor's messages are routed
+ * `buildTasks` takes a group of entries and builds an `ExtractTask` for each.
+ * `runExtractors` runs those grouped tasks together, sharing one `CompilerState`
+ * so TS parses the sources once. It also routes api-extractor's messages
  * through Rollup's diagnostic channels.
  */
 
@@ -32,43 +32,40 @@ export function buildTasks(
   },
 ): ExtractTask[] {
 
-  // Anchor to the tsconfig's dir so monorepo groups resolve their own
-  // package.json, not the one above Rollup's cwd.
-  const projectFolder = dirname(args.tsconfigPath)
-
-  // api-extractor's `Collector` requires the working package's package.json path
-  // and throws otherwise. `loadFileAndPrepare` would auto-resolve it via
-  // `PackageJsonLookup.tryGetPackageJsonFilePathFor` (anchored to an api-extractor
-  // config file), but the programmatic `prepare` we use has no config file to anchor
-  // to — so resolution falls to us. We use the very same `PackageJsonLookup`,
-  // anchoring it to the tsconfig's dir (so monorepo groups resolve their own package.json).
-  // This matches both the aformentioned path lookup, as well as the lookup `Collector` itself
-  // uses internally to classify external source files (when deriving package names for declaration
-  // references). Note that its ancestor walk skips nameless package.json files; a naive walk
-  // (e.g. `find-up`) could stop at a nameless monorepo root and hand `Collector` a path it
-  // would disagree with. Fresh instance per call so watch-mode rebuilds don't read a stale cache.
+  // `ExtractorConfig.prepare` requires a `packageJsonFullPath` purely as an API artifact:
+  // `Collector` throws if `packageFolder`/`packageJson` are unset, with a standing TODO to
+  // lift the requirement. Since we invoke `prepare` programmatically (no api-extractor
+  // config file to anchor a lookup off of), the resolution falls to us — and the choice
+  // matters: the `packageJson.name` we resolve becomes `workingPackage.name`, which
+  // `DeclarationReferenceGenerator` stamps onto every internal symbol. So we anchor per
+  // entry, not per group; the wrong package would mislabel them — observable only via
+  // TSDoc `{@link pkg!Symbol}` resolution given our disabled reports, but still wrong.
   //
-  // Collector requires `packageJsonFullPath`:
-  //   - `ExtractorConfig.prepare` sets `packageFolder` to `dirname(packageJsonFullPath)`: https://github.com/microsoft/rushstack/blob/main/apps/api-extractor/src/api/ExtractorConfig.ts#L867
-  //   - Collector requires `packageFolder`: https://github.com/microsoft/rushstack/blob/68497c5580db64436d7b854ac4135a47bb86deb7/apps/api-extractor/src/collector/Collector.ts#L123-L127
-  // - `ExtractorConfig.loadFileAndPrepare`'s internal `PackageJsonLookup`: https://github.com/microsoft/rushstack/blob/3793e2c87abbf2e4d4545566126d4e133cd7e061/apps/api-extractor/src/api/ExtractorConfig.ts#L604-L606
-  // - Collector's internal `PackageJsonLookup` (used for external sources):
-  //   - Initialized: https://github.com/microsoft/rushstack/blob/68497c5580db64436d7b854ac4135a47bb86deb7/apps/api-extractor/src/collector/Collector.ts#L108
-  //   - Shim invoked: https://github.com/microsoft/rushstack/blob/main/apps/api-extractor/src/generators/DeclarationReferenceGenerator.ts#L356-L357
-  //   - Actual invocation: https://github.com/microsoft/rushstack/blob/main/libraries/node-core-library/src/PackageJsonLookup.ts#L234
-  // - `PackageJsonLookup` skips nameless package.json (walks past MISSING_NAME_FIELD): https://github.com/microsoft/rushstack/blob/68497c5580db64436d7b854ac4135a47bb86deb7/libraries/node-core-library/src/PackageJsonLookup.ts#L385
-  const packageJsonFullPath = new PackageJsonLookup().tryGetPackageJsonFilePathFor(projectFolder)
-  if (!packageJsonFullPath) {
-    ctx.error(`Could not find a named package.json at or above ${projectFolder}`)
-  }
+  // `PackageJsonLookup` (rather than a generic find-up) skips nameless `package.json` files;
+  // monorepo roots are often intentionally nameless, and stopping at one would make
+  // `prepare` throw `MISSING_NAME_FIELD`. One instance per call: the cache amortizes across
+  // entries, and a fresh instance avoids stale reads in watch mode.
+  //
+  // - Collector throws without `packageFolder` + `packageJson` (with a TODO to lift it): https://github.com/microsoft/rushstack/blob/68497c5580db64436d7b854ac4135a47bb86deb7/apps/api-extractor/src/collector/Collector.ts#L123-L127
+  // - `ExtractorConfig.prepare` derives both from `packageJsonFullPath`: https://github.com/microsoft/rushstack/blob/68497c5580db64436d7b854ac4135a47bb86deb7/apps/api-extractor/src/api/ExtractorConfig.ts#L851-L867
+  // - `DeclarationReferenceGenerator` tags internal source files with `workingPackage.name`: https://github.com/microsoft/rushstack/blob/68497c5580db64436d7b854ac4135a47bb86deb7/apps/api-extractor/src/generators/DeclarationReferenceGenerator.ts#L364
+  // - `PackageJsonLookup` walks past nameless `package.json`: https://github.com/microsoft/rushstack/blob/68497c5580db64436d7b854ac4135a47bb86deb7/libraries/node-core-library/src/PackageJsonLookup.ts#L385
+  // - `loadNodePackageJson` throws `MISSING_NAME_FIELD` on a nameless `package.json`: https://github.com/microsoft/rushstack/blob/68497c5580db64436d7b854ac4135a47bb86deb7/libraries/node-core-library/src/PackageJsonLookup.ts#L290-L292
+  const packageJsonLookup = new PackageJsonLookup()
 
   return args.emitted.map(({ entry, dtsPath }) => {
+
+    const entryDir = dirname(entry.entryAbsPath)
+    const packageJsonFullPath = packageJsonLookup.tryGetPackageJsonFilePathFor(entryDir)
+    if (!packageJsonFullPath) {
+      ctx.error(`Could not find a named package.json at or above ${entryDir}`)
+    }
 
     const bundledDtsPath = join(args.groupDir, `bundled-${entry.fileName.replace(/[/\\]/g, '_')}`)
 
     const extractorConfig = ExtractorConfig.prepare({
       configObject: {
-        projectFolder,
+        projectFolder: dirname(packageJsonFullPath),
         mainEntryPointFilePath: dtsPath,
         bundledPackages: args.bundledPackages,
         compiler: { tsconfigFilePath: args.tsconfigPath },
