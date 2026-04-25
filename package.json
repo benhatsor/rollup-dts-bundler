@@ -35,8 +35,8 @@
     "node": ">=24.10.0"
   },
   "scripts": {
-    "build": "rollup -c --configPlugin typescript={tsconfig:\\'tsconfig.rollup.json\\'}",
-    "dev": "rollup -c --watch --configPlugin typescript={tsconfig:\\'tsconfig.rollup.json\\'}",
+    "build": "rollup -c --configPlugin typescript={tsconfig:\\'rollup.tsconfig.json\\'}",
+    "dev": "rollup -c --watch --configPlugin typescript={tsconfig:\\'rollup.tsconfig.json\\'}",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
