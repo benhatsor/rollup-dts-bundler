@@ -14,6 +14,13 @@
       "matchDepTypes": ["dependencies", "peerDependencies"],
       "matchUpdateTypes": ["major"],
       "commitMessagePrefix": "feat(deps)!:"
+    },
+    {
+      "matchDepTypes": ["peerDependencies", "devDependencies"],
+      "matchUpdateTypes": ["major"],
+      "matchPackageNames": ["rollup", "typescript"],
+      "groupName": "{{depName}}",
+      "commitMessagePrefix": "feat(deps)!:"
     }
   ],
   "postUpdateOptions": ["npmDedupe"],

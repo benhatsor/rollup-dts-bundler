@@ -1,132 +1,127 @@
 # Releasing
 
-How `rollup-dts-bundler` ships to npm, and the quality gates behind it.
+How `rollup-dts-bundler` ships to npm: the workflows, quality gates, and tooling behind a release.
 
 ## Overview
 
-There are two release paths. Both converge on one reusable workflow, re-run the full test suite before publishing, and authenticate to npm via OIDC trusted publishing.
+There are two release paths, and both converge on a single reusable workflow. Each one re-runs the full test suite before publishing and authenticates to npm via OIDC trusted publishing.
 
-| Path | Trigger | Version decided by | Release notes |
+| Path | Trigger | Version determined by | Release notes |
 |---|---|---|---|
-| **Manual** | `npm run release` (bumpp) | Maintainer (interactive prompt) | `conventional-changelog -p angular` |
-| **Auto** | Renovate-authored push to `main` | `semantic-release` | `conventional-changelog-angular` (same preset) |
+| Manual | `npm run release` (bumpp) | Maintainer, via interactive prompt | `conventional-changelog -p angular` |
+| Automated | Renovate-authored push to `main` | `semantic-release` | `conventional-changelog-angular` (same preset) |
 
 ## Test suite and coverage
 
-Tests live in [`test/`](test/) and run via Vitest.
+The test suite lives in [`test/`](test/) and runs under Vitest. `npm test` runs the suite; `npm run test:coverage` runs it with v8 coverage and is the variant CI and the release workflow use.
 
-- `npm test` — run the suite
-- `npm run test:coverage` — run with v8 coverage (used by CI and release)
+Coverage thresholds are enforced in [`vitest.config.ts`](vitest.config.ts) at 100% across statements, branches, functions, and lines. Falling below any threshold exits non-zero and turns CI or the release red. New code is expected to keep the suite at 100%, either with real tests or — for branches provably unreachable through the plugin's public surface — an inline `/* v8 ignore */` with a one-line reason.
 
-Coverage thresholds are enforced in [`vitest.config.ts`](vitest.config.ts):
+## Continuous integration
 
-| Metric | Threshold |
-|---|---|
-| Statements | 100% |
-| Branches | 100% |
-| Functions | 100% |
-| Lines | 100% |
+The CI workflow, [`ci.yml`](.github/workflows/ci.yml), runs on every push to `main`, every pull request, and on manual dispatch.
 
-Falling below any threshold exits non-zero and turns CI/release red. New code should keep the suite at 100%, either with real tests or — for branches that are provably unreachable through the plugin's public surface — an inline `/* v8 ignore */` with a one-line rationale.
-
-## CI — [`ci.yml`](.github/workflows/ci.yml)
-
-Runs on every push to `main`, every PR, and manual dispatch.
-
-- **Matrix:** Node `24.10` (our declared floor) and `lts/*` (drifts forward with Node's LTS line).
-- **Steps:** `npm ci` > `typecheck` > `test:coverage`. (`test/dist.test.ts` rebuilds `dist/` via its own `beforeAll`, so a broken build surfaces as a failed test — no separate build step is needed in CI.)
-- **Concurrency:** keyed per-PR / per-SHA, `cancel-in-progress: true`. A new push to the same PR kills the outdated run.
+- **Matrix:** Node `24.10` (the declared floor) and `lts/*`, which drifts forward with Node's LTS line.
+- **Steps:** `npm ci`, then `typecheck`, then `test:coverage`. There's no separate build step — [`test/dist.test.ts`](test/dist.test.ts) rebuilds `dist/` in its `beforeAll`, so a broken build surfaces as a failed test.
+- **Concurrency:** keyed per pull request and per commit SHA, with `cancel-in-progress: true`, so a new push to a pull request kills the outdated run.
 
 ## Node engine policy
 
-[`package.json`](package.json) declares:
+The [`package.json`](package.json) manifest declares:
 
 ```json
 "engines": { "node": ">=24.10.0" }
 ```
 
-The earliest API the plugin itself needs is `fs.mkdtempDisposableSync` (Node 24.4), but the floor sits at 24.10 because `semantic-release` (used in the auto-release path) requires it.
+The earliest API the plugin itself needs is `fs.mkdtempDisposableSync` (Node 24.4), but the floor sits at 24.10 because `semantic-release` — which drives the automated release path — requires it.
 
-`npm ci` is called with the `--engine-strict` flag, so it fails with `EBADENGINE` if any installed dependency raises its `engines.node` above our floor. Combined with CI pinned to Node `24.10`, this means: a dep bumps its Node floor above ours > CI red > Renovate automerge blocked > the maintainer is notified.
+`npm ci` runs with `--engine-strict`, so it fails with `EBADENGINE` if any installed dependency raises its `engines.node` above the project's floor. The CI matrix is also pinned to Node 24.10, so when a dependency raises its Node floor above that, CI turns red and Renovate's automerge stalls, leaving the conflict for the maintainer to handle. From there, the fix is either to bump the project's `engines` with a `feat!:` commit (triggering a major release), or to hold the dep with a Renovate ignore rule.
 
-When that happens, either:
-- Bump our `engines` with a `feat!:` commit (triggers a major release), or
-- Hold the dep via a Renovate ignore rule.
+## Automated releases
 
-## Automated releases (Renovate-driven)
+Automated releases are driven by Renovate. The pipeline is:
 
-1. Renovate opens a dep-update PR (weekly schedule).
-2. CI runs on the PR. If green, Renovate automerges.
-3. The merge-to-`main` push triggers [`release-auto.yml`](.github/workflows/release-auto.yml).
-4. That workflow checks `github.actor == 'renovate[bot]'` — manual pushes to `main` are filtered out.
-5. It calls the reusable [`release.yml`](.github/workflows/release.yml) with `is-auto: true`.
-6. [`semantic-release`](https://github.com/semantic-release/semantic-release) runs end-to-end.
+1. Renovate opens a dependency-update pull request on its weekly schedule.
+2. CI runs against the pull request. If green, Renovate automerges it.
+3. The resulting push to `main` triggers [`release-auto.yml`](.github/workflows/release-auto.yml).
+4. That workflow gates on `github.actor == 'renovate[bot]'`, filtering out manual pushes, and calls the [`release.yml`](.github/workflows/release.yml) with the `is-auto: true` argument.
+5. [`semantic-release`](https://github.com/semantic-release/semantic-release) runs end-to-end.
 
-[`.releaserc.json`](.releaserc.json) configures four plugins:
+The [`.releaserc.json`](.releaserc.json) config enables four semantic-release plugins:
 
-- `commit-analyzer` — reads conventional commits since last tag, decides bump type
-- `release-notes-generator` — produces `conventional-changelog` notes from those commits (angular preset)
-- `npm` — bumps `package.json`, publishes via OIDC, pushes tag
-- `github` — creates the GitHub release (PR/issue commenting/labeling disabled)
+- `commit-analyzer` reads conventional commits since the last tag and decides the bump type.
+- `release-notes-generator` produces release notes from those commits using the angular preset.
+- `npm` bumps `package.json`, publishes via OIDC, and pushes the tag.
+- `github` creates the GitHub release. PR and issue commenting and labeling are disabled.
 
-Commit-type to release mapping, set by [`renovate.json`](renovate.json):
+The mapping from Renovate-authored commits to release effects, set in [`renovate.json`](renovate.json):
 
 | Renovate change | Commit prefix | Release effect |
 |---|---|---|
 | Peer or runtime major | `feat(deps)!:` | Major |
-| Runtime dep minor/patch | `fix(deps):` | Patch |
-| devDep (any update) | `chore(deps):` | None |
-| Peer minor/patch | — | No PR (caret range already covers) |
+| Runtime dependency minor or patch | `fix(deps):` | Patch |
+| Development dependency, any update | `chore(deps):` | None |
+| Peer minor or patch | — | No pull request opened |
 
-Peer and devDep updates of the same package land in a single PR. Renovate's default [`branchTopic`](https://docs.renovatebot.com/configuration-options/#branchtopic) is keyed on `depNameSanitized` + major version — depType isn't part of the branch name, so both updates target the same branch and ship as one commit. The test suite therefore always runs against the version the peer range declares.
+Runtime minor and patch updates are lockfile-only — the existing caret range in `package.json` already covers them, so only `package-lock.json` changes — but they still ship as a `fix(deps):` commit and trigger a patch release.
 
-> Note: If no commits since the last tag qualify (all `chore:` or non-conventional), semantic-release logs "no release published" and exits.
+Peer and devDep major updates for the same package are forced into a single commit by an explicit packageRule:
+
+```json
+{
+  "matchDepTypes": ["peerDependencies", "devDependencies"],
+  "matchUpdateTypes": ["major"],
+  "matchPackageNames": ["rollup", "typescript"],
+  "groupName": "{{depName}}",
+  "commitMessagePrefix": "feat(deps)!:"
+}
+```
+
+The rule is scoped to majors because that's the only case where a mismatch can happen — non-major peer updates produce no PR (the existing caret already covers them), and devDep non-majors join the weekly `group:allNonMajor` batch. Without the rule, branch-name collision usually colocates the two updates anyway, but timing edge cases (rate limits, partial runs, a PR auto-merging before the second depType is processed) could publish a peer range that doesn't match the version the suite actually ran against.
+
+The package list mirrors the project's peers. Renovate has no matcher for "appears in `peerDependencies`," so the names are listed explicitly; adding a peer to `package.json` requires also adding it here. The `commitMessagePrefix` is set on the rule itself rather than inherited from the more general major rule above, because Renovate's prefix on a grouped commit is non-deterministic when only some of the grouped updates carry an explicit prefix — and the safe-fallback behavior on mixed-type groups is `chore(deps):`, which would silently skip the release.
+
+If no commits since the last tag qualify for a release — for example, only `chore:` or non-conventional commits have landed — semantic-release logs "no release published" and exits.
 
 ## Manual releases
 
+A manual release starts with:
+
 ```bash
-npm run release   # runs bumpp
+npm run release
 ```
 
-[bumpp](https://github.com/antfu-collective/bumpp) prompts for the new version (patch / minor / major / custom), updates `package.json`, commits as `chore: release vX.Y.Z`, creates an annotated tag, and pushes both with `--follow-tags`.
+This invokes [bumpp](https://github.com/antfu-collective/bumpp), which prompts for the new version (patch, minor, major, or custom). Once chosen, bumpp updates `package.json`, commits the change as `chore: release vX.Y.Z`, and creates an annotated tag. The branch and tag are then pushed together with `--follow-tags`.
 
-Pushing the tag triggers [`release-manual.yml`](.github/workflows/release-manual.yml), which calls [`release.yml`](.github/workflows/release.yml) with `is-auto: false`. The bumpp commit itself lands on `main` but doesn't fire the auto path, as [`release-auto.yml`](.github/workflows/release-auto.yml) filters on `github.actor == 'renovate[bot]'`. The manual path then runs:
+Pushing the tag triggers [`release-manual.yml`](.github/workflows/release-manual.yml), which calls [`release.yml`](.github/workflows/release.yml) with the `is-auto: false` argument. The bumpp commit itself lands on `main` but doesn't fire the automated path, since [`release-auto.yml`](.github/workflows/release-auto.yml) gates on `github.actor == 'renovate[bot]'`. The manual path then runs:
 
 ```bash
 npm publish --provenance --access public
 npx conventional-changelog -p angular | gh release create "$TAG" -F -
 ```
 
-Release notes are generated from conventional-style commits since the previous tag. Non-conventional commits are omitted, so refactor noise and WIP messages stay out of the changelog.
+Release notes are generated from conventional-style commits since the previous tag. Non-conventional commits are omitted, which keeps refactor noise and WIP messages out of the changelog. Anything that should appear in the changelog needs a conventional prefix like `feat:`, `fix:`, `refactor:`, or `docs:`.
 
-**Commit discipline matters.** Work that should appear in the changelog needs a conventional prefix (`feat:`, `fix:`, `refactor:`, `docs:`, etc.). Anything else — or no prefix — is omitted.
+The manual path exists alongside the automated one because features often span multiple commits — refactor, then infrastructure, then the feature itself. A manual tag push lets those commits be batched into a single release.
 
-**Why have a manual path?** Features often ship across multiple commits (refactor > infrastructure > feature). The manual tag push lets us batch commits into a single release and keep noise to a minimum.
+## Reusable release workflow
 
-## Reusable workflow — [`release.yml`](.github/workflows/release.yml)
+Both release paths call a single `workflow_call` workflow defined in [`release.yml`](.github/workflows/release.yml). It checks out with full history (needed for tag detection) and sets up Node 24.10 with the npm registry configured. After installing deps, it runs typecheck, tests with coverage, and an explicit build step. The build step produces the `dist/` artifact for publish; `test/dist.test.ts` would also build it via `beforeAll`, but keeping `build` explicit makes the publish precondition visible.
 
-Both paths call this single `workflow_call` workflow. It:
-
-1. Checks out with full history (needed for tag detection).
-2. Sets up Node `24.10` with the npm registry configured.
-3. Installs deps; runs typecheck, tests (with coverage), and build as a final safety net. The explicit `build` step produces the `dist/` artifact for publish — `test/dist.test.ts` would also build it via `beforeAll`, but keeping `build` explicit makes the publish precondition visible.
-4. Branches on `inputs.is-auto`:
-   - Manual: `npm publish` + `conventional-changelog | gh release create`
-   - Auto: `npx semantic-release`
+It then branches on the `inputs.is-auto` argument: the manual path runs `npm publish` followed by `conventional-changelog | gh release create`; the automated path runs `npx semantic-release`.
 
 Settings:
 
-- **Permissions:** `contents: write` (tags, commits, releases) + `id-token: write` (npm OIDC). Caller workflows must grant both — a callee's permissions are a ceiling, not a grant.
+- **Permissions:** `contents: write` (tags, commits, releases) and `id-token: write` (npm OIDC). Caller workflows have to grant both — a callee's permissions are a ceiling, not a grant.
 - **Concurrency:** `group: release`, `cancel-in-progress: false`. `npm publish` is irreversible, so an in-flight release must finish; additional triggers queue behind it.
-- **Timeout:** 15 minutes. Fails fast instead of the 6-hour default.
+- **Timeout:** 15 minutes. Fails fast instead of GitHub Actions' six-hour default.
 
-## Renovate — [`renovate.json`](renovate.json)
+## Renovate configuration
 
-- `automerge: true` + weekly schedule — PRs merge themselves when CI is green.
-- `group:allNonMajor` — all minor/patch updates batch into one PR per cycle (less noise, one patch release per batch).
-- `rangeStrategy: replace` — peer ranges follow the version we actually test against. Peer minor/patch produces no PR (the caret already covers it); peer majors rewrite the range (e.g. `^4.0.0` → `^5.0.0`) in the same PR that bumps the matching devDep.
-- Major updates (peer or runtime) > `feat(deps)!:` > major release. The `!` after the scope is the conventional-commits breaking marker; the angular preset honors it without needing a `BREAKING CHANGE:` body.
-- Runtime dep minor/patch > `fix(deps):` > patch release.
-- devDep (any update) > `chore(deps):` > no release. A devDep major (e.g. vitest 5) doesn't force a major on the library since it doesn't affect consumers.
+Renovate's behavior is configured in [`renovate.json`](renovate.json). `automerge: true` plus a weekly schedule lets pull requests merge themselves when CI is green. The `group:allNonMajor` preset batches all minor and patch updates into one pull request per cycle, which means less noise and one patch release per batch.
 
-devDeps don't appear in `renovate.json` because they need no override: they're still picked up by Renovate (managed by the `npm` manager like every other depType) and land on Renovate's default `chore(deps):` prefix — which is exactly what we want. The two `packageRules` exist only to override the default for runtime + peer deps, where `chore(deps):` would silently swallow a release that should fire.
+`rangeStrategy: replace` tells Renovate to leave a range alone when the new version still satisfies it, and to rewrite it only when the new version falls outside. With caret ranges, that means majors only. For peers, this has two consequences: minor and patch updates open no pull request (the existing caret already covers them), while a major update rewrites the range (e.g. `^4.0.0` becomes `^5.0.0`) in the same pull request that bumps the matching devDep.
+
+Major updates to peer or runtime deps are committed as `feat(deps)!:` and trigger a major release. The trailing `!` is the conventional-commits breaking-change marker, which the angular preset honors without needing a `BREAKING CHANGE:` body. Runtime dep minor and patch updates (lockfile-only changes) use `fix(deps):` and trigger a patch release. devDep updates use `chore(deps):` and trigger no release: a devDep major (e.g. Vitest 5) doesn't force a major on the library since it doesn't affect consumers.
+
+devDeps don't appear in `renovate.json` because they need no override. Renovate picks them up through the default `npm` manager and applies its default `chore(deps):` prefix — which is the intended behavior. The `packageRules` entries exist only to override that default for runtime and peer deps, where `chore(deps):` would otherwise swallow a release that should fire.
