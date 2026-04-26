@@ -19,7 +19,6 @@
     "plugin",
     "dts",
     "typescript",
-    "vue",
     "jsdoc"
   ],
   "exports": {

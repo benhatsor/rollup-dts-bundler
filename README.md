@@ -55,7 +55,7 @@ dts({
 The entry point is stubbed out so Rollup only provides the input/output config. All real work happens in the `generateBundle` hook: declarations are emitted via tsc, fed to api-extractor, and the result is output as an asset.
 
 ## Releases
-`semantic-release` cuts versions automatically when Renovate-driven dep updates land on `main`; for batched feature work, `npm run release` ships a manual version. Both paths re-run the full test suite (a CI gate enforces 100% coverage) and publish to npm with OIDC provenance. See [RELEASING.md](/RELEASING.md) for the full pipeline.
+`semantic-release` cuts versions automatically when Renovate auto-merges dep updates to `main`, releasing major versions for major updates. For batched feature work, `npm run release` ships a manual version. Both paths run the full test suite (a CI gate enforces 100% coverage) and publish to npm with OIDC provenance. See [RELEASING.md](/RELEASING.md) for the full pipeline.
 
 ## License
 [MIT](/LICENSE)
