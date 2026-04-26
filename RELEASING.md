@@ -47,7 +47,7 @@ Runs on every push to `main`, every PR, and manual dispatch.
 
 The earliest API the plugin itself needs is `fs.mkdtempDisposableSync` (Node 24.4), but the floor sits at 24.10 because `semantic-release` (used in the auto-release path) requires it.
 
-[`.npmrc`](.npmrc) sets `engine-strict=true`, so `npm ci` fails with `EBADENGINE` if any installed dependency raises its `engines.node` above our floor. Combined with CI pinned to Node `24.10`, this means: a dep bumps its Node floor above ours > CI red > Renovate automerge blocked > the maintainer is notified.
+`npm ci` is called with the `--engine-strict` flag, so it fails with `EBADENGINE` if any installed dependency raises its `engines.node` above our floor. Combined with CI pinned to Node `24.10`, this means: a dep bumps its Node floor above ours > CI red > Renovate automerge blocked > the maintainer is notified.
 
 When that happens, either:
 - Bump our `engines` with a `feat!:` commit (triggers a major release), or
