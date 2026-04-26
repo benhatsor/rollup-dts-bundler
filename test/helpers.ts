@@ -4,7 +4,7 @@
 
 import { rollup, type InputOption, type OutputOptions } from 'rollup'
 import { join } from 'node:path'
-import dts, { type DtsOptions } from '../src/index.ts'
+import { dts, type DtsOptions } from '../src/index'
 
 const fixturesDir = join(import.meta.dirname, 'fixtures')
 
@@ -64,10 +64,16 @@ export async function bundle(fixture: string, opts: BundleOpts = {}): Promise<Re
 
     const { output: chunks } = await build.generate({ format: 'es', ...output })
 
+    // `OutputAsset.source` is `string | Uint8Array`; the plugin always
+    // emits strings for `.d.ts`, but the typeof check makes that explicit
+    // and gives a clear error if the contract ever changes.
     return Object.fromEntries(
-      chunks.filter(c => c.type === 'asset').map(c =>
-        [c.fileName, c.source as string]
-      ),
+      chunks.filter(c => c.type === 'asset').map(c => {
+        if (typeof c.source !== 'string') {
+          throw new Error(`expected string asset source for ${c.fileName}`)
+        }
+        return [c.fileName, c.source]
+      }),
     )
 
   })
@@ -86,11 +92,11 @@ export async function bundle(fixture: string, opts: BundleOpts = {}): Promise<Re
  */
 export async function bundleOne(fixture: string, opts: BundleOpts = {}): Promise<string> {
 
-  const assets = Object.values(
-    await bundle(fixture, opts)
-  )
-
-  if (assets.length !== 1) throw new Error(`Expected 1 asset, got ${assets.length}`)
-  return assets[0]
+  const assets = Object.values(await bundle(fixture, opts))
+  const [single, ...extras] = assets
+  if (!single || extras.length > 0) {
+    throw new Error(`Expected 1 asset, got ${assets.length}`)
+  }
+  return single
 
 }

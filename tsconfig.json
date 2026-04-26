@@ -6,6 +6,10 @@
     "moduleResolution": "bundler",
     "strict": true,
     "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noUncheckedIndexedAccess": true,
+    "erasableSyntaxOnly": true,
     "declaration": true,
     "declarationMap": true,
     "emitDeclarationOnly": true,
@@ -15,5 +19,6 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["src"]
+  "include": ["src", "test"],
+  "exclude": ["test/fixtures"]
 }

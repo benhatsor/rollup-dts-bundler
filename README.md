@@ -2,11 +2,12 @@
 
 [![npm version][npm-version-src]][npm-version-href]
 [![CI][ci-src]][ci-href]
+[![Coverage][coverage-src]][coverage-href]
 
 Rollup plugin for bundling `.d.ts` declarations via [@microsoft/api-extractor].
 
 ## Why?
-[@microsoft/api-extractor] (Microsoft's official `.d.ts` bundler) produces significantly higher-quality output than most other third-party `.d.ts` bundlers (eg. [rollup-plugin-dts], [rolldown-plugin-dts], [dts-bundle-generator]), but is designed as a monolithic CLI tool with verbose config files. This plugin wraps it into a simple Rollup interface.
+[@microsoft/api-extractor] is Microsoft's official `.d.ts` bundler. It produces higher-quality output than common alternatives ([rollup-plugin-dts], [rolldown-plugin-dts], [dts-bundle-generator]), but is designed as a monolithic CLI with verbose config files. This plugin wraps it in a simple Rollup interface.
 
 ## Usage
 
@@ -17,7 +18,7 @@ npm install --save-dev rollup-dts-bundler
 
 Add it to your `rollup.config.js`:
 ```js
-import dts from 'rollup-dts-bundler'
+import { dts } from 'rollup-dts-bundler'
 
 export default [
   // …
@@ -29,12 +30,12 @@ export default [
 ]
 ```
 
-And then instruct TypeScript where to find your definitions inside your `package.json`:
+Then point your `package.json` at the output:
 ```json
   "types": "dist/index.d.ts",
 ```
 
-> Note that the plugin will automatically exclude external libraries (eg. `@types`) from bundling.
+> External libraries (e.g. `@types/*`) are automatically excluded from bundling.
 
 ## Options
 ```ts
@@ -53,6 +54,9 @@ dts({
 ## How it works
 The entry point is stubbed out so Rollup only provides the input/output config. All real work happens in the `generateBundle` hook: declarations are emitted via tsc, fed to api-extractor, and the result is output as an asset.
 
+## Releases
+`semantic-release` cuts versions automatically when Renovate-driven dep updates land on `main`; for batched feature work, `npm run release` ships a manual version. Both paths re-run the full test suite (a CI gate enforces 100% coverage) and publish to npm with OIDC provenance. See [RELEASING.md](/RELEASING.md) for the full pipeline.
+
 ## License
 [MIT](/LICENSE)
 
@@ -68,3 +72,5 @@ The entry point is stubbed out so Rollup only provides the input/output config. 
 [npm-version-href]: https://npmjs.com/package/rollup-dts-bundler
 [ci-src]: https://github.com/benhatsor/rollup-dts-bundler/actions/workflows/ci.yml/badge.svg
 [ci-href]: https://github.com/benhatsor/rollup-dts-bundler/actions/workflows/ci.yml
+[coverage-src]: https://img.shields.io/badge/coverage-100%25-brightgreen
+[coverage-href]: https://github.com/benhatsor/rollup-dts-bundler/blob/main/vitest.config.ts

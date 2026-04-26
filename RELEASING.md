@@ -22,19 +22,19 @@ Coverage thresholds are enforced in [`vitest.config.ts`](vitest.config.ts):
 
 | Metric | Threshold |
 |---|---|
-| Statements | 85% |
-| Branches | 65% |
-| Functions | 95% |
-| Lines | 95% |
+| Statements | 100% |
+| Branches | 100% |
+| Functions | 100% |
+| Lines | 100% |
 
-Falling below any threshold exits non-zero and turns CI/release red. Thresholds sit just below current values — high enough to catch regressions, low enough to avoid false alarms. Only raise them when every existing file would still pass.
+Falling below any threshold exits non-zero and turns CI/release red. New code should keep the suite at 100%, either with real tests or — for branches that are provably unreachable through the plugin's public surface — an inline `/* v8 ignore */` with a one-line rationale.
 
 ## CI — [`ci.yml`](.github/workflows/ci.yml)
 
 Runs on every push to `main`, every PR, and manual dispatch.
 
-- **Matrix:** Node `24.4` (our declared floor) and `lts/*` (drifts forward with Node's LTS line).
-- **Steps:** `npm ci` > `typecheck` > `build` > `test:coverage`.
+- **Matrix:** Node `24.10` (our declared floor) and `lts/*` (drifts forward with Node's LTS line).
+- **Steps:** `npm ci` > `typecheck` > `test:coverage`. (`test/dist.test.ts` rebuilds `dist/` via its own `beforeAll`, so a broken build surfaces as a failed test — no separate build step is needed in CI.)
 - **Concurrency:** keyed per-PR / per-SHA, `cancel-in-progress: true`. A new push to the same PR kills the outdated run.
 
 ## Node engine policy
@@ -42,12 +42,12 @@ Runs on every push to `main`, every PR, and manual dispatch.
 [`package.json`](package.json) declares:
 
 ```json
-"engines": { "node": ">=24.4.0" }
+"engines": { "node": ">=24.10.0" }
 ```
 
-The floor is `24.4` because we use `fs.mkdtempDisposableSync`, added in that release.
+The earliest API the plugin itself needs is `fs.mkdtempDisposableSync` (Node 24.4), but the floor sits at 24.10 because `semantic-release` (used in the auto-release path) requires it.
 
-[`.npmrc`](.npmrc) sets `engine-strict=true`, so `npm ci` fails with `EBADENGINE` if any installed dependency raises its `engines.node` above our floor. Combined with CI pinned to Node `24.4`, this means: a dep bumps its Node floor above ours > CI red > Renovate automerge blocked > the maintainer is notified.
+[`.npmrc`](.npmrc) sets `engine-strict=true`, so `npm ci` fails with `EBADENGINE` if any installed dependency raises its `engines.node` above our floor. Combined with CI pinned to Node `24.10`, this means: a dep bumps its Node floor above ours > CI red > Renovate automerge blocked > the maintainer is notified.
 
 When that happens, either:
 - Bump our `engines` with a `feat!:` commit (triggers a major release), or
@@ -78,7 +78,7 @@ Commit-type to release mapping, set by [`renovate.json`](renovate.json):
 | devDep minor/patch | `chore:` | None |
 | Peer minor/patch | — | Disabled (range already covers) |
 
-> Note: If no conventional commits since the last tag warranted a release (all `chore:` / non-conventional), semantic-release will show a "no release published" message without publishing a release.
+> Note: If no commits since the last tag qualify (all `chore:` or non-conventional), semantic-release logs "no release published" and exits.
 
 ## Manual releases
 
@@ -106,13 +106,13 @@ Release notes are generated from conventional-style commits since the previous t
 Both paths call this single `workflow_call` workflow. It:
 
 1. Checks out with full history (needed for tag detection).
-2. Sets up Node `24.4` with the npm registry configured.
-3. Installs deps; runs typecheck and tests as a final safety net.
+2. Sets up Node `24.10` with the npm registry configured.
+3. Installs deps; runs typecheck, tests (with coverage), and build as a final safety net. The explicit `build` step produces the `dist/` artifact for publish — `test/dist.test.ts` would also build it via `beforeAll`, but keeping `build` explicit makes the publish precondition visible.
 4. Branches on `inputs.is-auto`:
    - Manual: `npm publish` + `conventional-changelog | gh release create`
    - Auto: `npx semantic-release`
 
-Key policies:
+Settings:
 
 - **Permissions:** `contents: write` (tags, commits, releases) + `id-token: write` (npm OIDC). Caller workflows must grant both — a callee's permissions are a ceiling, not a grant.
 - **Concurrency:** `group: release`, `cancel-in-progress: false`. `npm publish` is irreversible, so an in-flight release must finish; additional triggers queue behind it.

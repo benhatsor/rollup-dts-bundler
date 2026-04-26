@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest'
-import { bundle } from './helpers.ts'
+import { bundle } from './helpers'
 
 test('handles entries resolving to different tsconfigs', async () => {
   // pkg-a and pkg-b each have their own tsconfig; with no override, each
@@ -33,9 +33,11 @@ test('bundles multiple entry points', async () => {
   expect(result['main.d.ts']).toContain('interface Main')
   expect(result['cli.d.ts']).toContain('interface Cli')
 
-  // Banner lands on each entry, not just the first.
-  expect(result['main.d.ts'].startsWith('/* multi-entry banner */\n')).toBe(true)
-  expect(result['cli.d.ts'].startsWith('/* multi-entry banner */\n')).toBe(true)
+  // Banner lands on each entry, not just the first. `toMatch` accepts
+  // `string | undefined` and fails clearly when undefined, so we don't
+  // need a non-null assertion to satisfy `noUncheckedIndexedAccess`.
+  expect(result['main.d.ts']).toMatch(/^\/\* multi-entry banner \*\/\n/)
+  expect(result['cli.d.ts']).toMatch(/^\/\* multi-entry banner \*\/\n/)
 
   // Shared types are inlined in each bundle (no cross-bundle relative imports).
   expect(result['main.d.ts']).toContain('interface Shared')

@@ -7,6 +7,8 @@ on:
 
 jobs:
   release:
+    # Filter to Renovate-authored merges only — manual pushes to main go
+    # through the tag-driven `release-manual.yml` path.
     if: github.actor == 'renovate[bot]'
     uses: ./.github/workflows/release.yml
     with:

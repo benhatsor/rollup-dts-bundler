@@ -39,15 +39,21 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      # Re-run tests with the full merged code
+      # Re-run tests with the full merged code. Uses `test:coverage` (not
+      # `test`) so the coverage threshold is enforced at release time too —
+      # if anything bypassed CI, the release gate still catches it.
+      # `test/dist.test.ts` self-builds dist via its own `beforeAll`, so
+      # this step doesn't depend on a prior build.
       - name: Run tests
-        run: npm test
+        run: npm run test:coverage
 
-      # Build for release
+      # Build the publish artifact. The test step already builds dist as a
+      # side effect of `test/dist.test.ts`, but running `build` explicitly
+      # here keeps the build > publish chain readable in the workflow.
       - name: Build
         run: npm run build
 
-      # User created tag: Auto-generate changelog and publish
+      # User-created tag: auto-generate changelog and publish.
       - name: Manual release
         if: ${{ !inputs.is-auto }}
         env:
@@ -57,7 +63,7 @@ jobs:
           npx conventional-changelog -p angular \
             | gh release create "$GITHUB_REF_NAME" -F -
 
-      # Renovate auto-merged to main: Auto-publish with semantic-release
+      # Renovate-authored merge to main: publish via semantic-release.
       - name: Automatic release
         if: ${{ inputs.is-auto }}
         env:

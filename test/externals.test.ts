@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest'
-import { bundleOne } from './helpers.ts'
+import { bundleOne } from './helpers'
 
 test('preserves external library imports', async () => {
   const output = await bundleOne('external')
@@ -8,7 +8,7 @@ test('preserves external library imports', async () => {
   expect(output).toContain("from 'ext-lib'")
   expect(output).toContain('function process')
 
-  // The external interface should NOT be inlined
+  // The external interface should not be inlined
   expect(output).not.toMatch(/interface ExternalType/)
 })
 

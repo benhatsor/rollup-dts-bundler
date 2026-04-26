@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest'
-import { bundleOne } from './helpers.ts'
+import { bundleOne } from './helpers'
 
 test('bundles declarations from multiple files into one', async () => {
   const output = await bundleOne('basic')

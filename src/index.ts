@@ -1,12 +1,21 @@
 /**
- * Plugin entry point. The plugin itself is intentionally thin: it marks entry
- * modules, stubs their JS so Rollup emits one chunk per entry, and defers the
- * real work (emitting and bundling .d.ts files) to the `generateBundle` hook,
- * calling `./pipeline.ts`'s `bundleDeclarations`.
+ * Plugin entry — Rollup build-phase hooks. One of two files
+ * (along with `bundle.ts`) that make up the plugin's surface to Rollup.
+ *
+ * The plugin shell is intentionally thin. Its only job during the build phase is
+ * to give every entry a chunk we can later replace with a bundled `.d.ts`, by:
+ *   - marking every non-entry import as external, so Rollup never walks the
+ *     import graph; and
+ *   - returning an empty source for each entry, so Rollup produces one stub JS
+ *     chunk per entry anchored to its `facadeModuleId`.
+ *
+ * The real work — emitting `.d.ts` files from the entries and bundling the emitted
+ * declarations with api-extractor — is deferred to the `generateBundle` hook,
+ * which hands off to `bundleDeclarations` in `bundle.ts`.
  */
 
 import type { Plugin } from 'rollup'
-import { bundleDeclarations } from './pipeline'
+import { bundleDeclarations } from './bundle'
 
 export interface DtsOptions {
   /**
@@ -24,25 +33,28 @@ export interface DtsOptions {
   bundledPackages?: string[]
 }
 
-export default function dts(opts: DtsOptions = {}): Plugin {
+export function dts(opts: DtsOptions = {}): Plugin {
   return {
     name: 'rollup-dts-bundler',
 
     resolveId(source, importer) {
-      // For entries, return null so Rollup's default resolver gives us an
-      // absolute `facadeModuleId` later to map back to the emitted .d.ts.
+      // Entries (no importer): defer to Rollup's default resolver, so the
+      // resulting chunk gets an absolute `facadeModuleId` we can map back
+      // to its emitted `.d.ts` later in the pipeline.
       if (!importer) {
         if (!/\.tsx?$/.test(source)) {
           this.error(`Entry point must be a .ts or .tsx file, got: ${source}`)
         }
         return null
       }
-      // Everything else is external so Rollup never walks the import graph.
+      // Everything reachable from an entry is marked external — Rollup
+      // never walks the import graph, so each entry stays self-contained.
       return { id: source, external: true }
     },
 
-    // Non-entries are external, so anything reaching `load` is an entry.
-    // Return empty code so Rollup emits one chunk per entry with no JS.
+    // Anything reaching `load` is an entry (non-entries were marked external
+    // above). Returning empty code makes Rollup emit one stub JS chunk per
+    // entry, which `generateBundle` will later swap for a bundled `.d.ts` asset.
     load() {
       return { code: '', moduleSideEffects: 'no-treeshake' }
     },

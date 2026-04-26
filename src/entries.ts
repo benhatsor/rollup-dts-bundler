@@ -1,14 +1,16 @@
 /**
- * Entry discovery and grouping, run before `emitDeclarations` / `buildTasks`.
+ * Pipeline stage 1 — entry discovery and grouping. Runs once per Rollup
+ * output, before the per-group work in stages 2 and 3 begins.
  *
- * `collectEntries` walks Rollup's output bundle and pairs each chunk with its
- * source module's absolute path; `emitDeclarations` later uses that path to map
- * emitted `.d.ts` files back to their chunk.
+ * `collectEntries` walks Rollup's output bundle and pairs each chunk with the
+ * absolute path of its source entry module. `emitDeclarations` uses that path
+ * in stage 2 to locate each entry's emitted `.d.ts`.
  *
- * `groupByTsconfig` splits entries by tsconfig — either the user's override
- * (one group covering all entries) or each entry's nearest `tsconfig.json`.
- * Entries sharing a tsconfig later share a TS program downstream,
- * letting api-extractor reuse a single `CompilerState`.
+ * `groupByTsconfig` then partitions those entries by tsconfig — either the
+ * user's override (one group covering everything) or each entry's nearest
+ * `tsconfig.json`. Entries that share a tsconfig share a TS program in
+ * stage 2, which lets api-extractor reuse a single `CompilerState` across
+ * the group in stage 3.
  */
 
 import type { OutputBundle, OutputChunk, PluginContext } from 'rollup'
@@ -30,9 +32,10 @@ export function collectEntries(ctx: PluginContext, bundle: OutputBundle): Entry[
   })
 }
 
-// If there's an override, all entries go in one group. Otherwise, each entry
-// walks up from its own directory; entries that land on the same tsconfig
-// end up in the same group and share a TS program downstream.
+// With an override, every entry collapses into a single group. Without one,
+// each entry walks up from its own directory to the nearest `tsconfig.json`;
+// entries that land on the same config share a group — and, downstream, a
+// TS program.
 export function groupByTsconfig(
   ctx: PluginContext,
   entries: Entry[],
@@ -43,8 +46,8 @@ export function groupByTsconfig(
   const groups = new Map<string, Entry[]>()
 
   for (const entry of entries) {
-    // If an override was given, resolve it relative to cwd. Otherwise let
-    // TypeScript's own resolver walk up from the entry's directory to the
+    // If an override was given, resolve it relative to cwd. Otherwise,
+    // let TS's own resolver walk up from the entry's directory to the
     // nearest `tsconfig.json`.
     const tsconfigPath = override
       ? resolve(cwd, override)

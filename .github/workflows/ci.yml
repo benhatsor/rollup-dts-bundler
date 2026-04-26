@@ -7,7 +7,7 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# Clear GitHub token permissions
+# Least-privilege GITHUB_TOKEN scope
 permissions:
   contents: read
 
@@ -36,11 +36,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      # Ensure build succeeds
-      - name: Build
-        run: npm run build
-
-      # Run tests and see if coverage changed
-      # (maintainer diagnostic to prevent test regression)
+      # Run the suite and enforce the coverage thresholds in vitest.config.ts.
+      # `test/dist.test.ts` rebuilds dist/ in its own `beforeAll`, so a broken
+      # `npm run build` surfaces here as a failed test rather than needing a
+      # separate Build step.
       - name: Run tests with coverage
         run: npm run test:coverage

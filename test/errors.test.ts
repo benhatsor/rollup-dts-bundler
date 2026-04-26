@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest'
-import { bundle } from './helpers.ts'
+import { bundle } from './helpers'
 
 test('errors when entry point is not a .ts or .tsx file', async () => {
   await expect(bundle('basic', { input: 'src/index.js' })).rejects.toThrow(/\.ts or \.tsx/)
