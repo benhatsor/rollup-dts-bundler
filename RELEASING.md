@@ -73,10 +73,12 @@ Commit-type to release mapping, set by [`renovate.json`](renovate.json):
 
 | Renovate change | Commit prefix | Release effect |
 |---|---|---|
-| Peer or runtime major | `feat!:` + `BREAKING CHANGE:` body | Major |
-| Runtime dep minor/patch | `fix:` | Patch |
-| devDep minor/patch | `chore:` | None |
-| Peer minor/patch | — | Disabled (range already covers) |
+| Peer or runtime major | `feat(deps)!:` | Major |
+| Runtime dep minor/patch | `fix(deps):` | Patch |
+| devDep (any update) | `chore(deps):` | None |
+| Peer minor/patch | — | No PR (caret range already covers) |
+
+Peer and devDep updates of the same package land in a single PR. Renovate's default [`branchTopic`](https://docs.renovatebot.com/configuration-options/#branchtopic) is keyed on `depNameSanitized` + major version — depType isn't part of the branch name, so both updates target the same branch and ship as one commit. The test suite therefore always runs against the version the peer range declares.
 
 > Note: If no commits since the last tag qualify (all `chore:` or non-conventional), semantic-release logs "no release published" and exits.
 
@@ -122,6 +124,9 @@ Settings:
 
 - `automerge: true` + weekly schedule — PRs merge themselves when CI is green.
 - `group:allNonMajor` — all minor/patch updates batch into one PR per cycle (less noise, one patch release per batch).
-- Peer deps minor/patch updates disabled — `^4.0.0` already covers every 4.x.
-- Major updates (peer or runtime) > `feat!:` with `BREAKING CHANGE:` body > major release.
-- devDep minor/patch > `chore:` > no release.
+- `rangeStrategy: replace` — peer ranges follow the version we actually test against. Peer minor/patch produces no PR (the caret already covers it); peer majors rewrite the range (e.g. `^4.0.0` → `^5.0.0`) in the same PR that bumps the matching devDep.
+- Major updates (peer or runtime) > `feat(deps)!:` > major release. The `!` after the scope is the conventional-commits breaking marker; the angular preset honors it without needing a `BREAKING CHANGE:` body.
+- Runtime dep minor/patch > `fix(deps):` > patch release.
+- devDep (any update) > `chore(deps):` > no release. A devDep major (e.g. vitest 5) doesn't force a major on the library since it doesn't affect consumers.
+
+devDeps don't appear in `renovate.json` because they need no override: they're still picked up by Renovate (managed by the `npm` manager like every other depType) and land on Renovate's default `chore(deps):` prefix — which is exactly what we want. The two `packageRules` exist only to override the default for runtime + peer deps, where `chore(deps):` would silently swallow a release that should fire.
