@@ -81,6 +81,8 @@ The rule is scoped to majors because that's the only case where a mismatch can h
 
 The package list mirrors the project's peers. Renovate has no matcher for "appears in `peerDependencies`," so the names are listed explicitly; adding a peer to `package.json` requires also adding it here. The `commitMessagePrefix` is set on the rule itself rather than inherited from the more general major rule above, because Renovate's prefix on a grouped commit is non-deterministic when only some of the grouped updates carry an explicit prefix — and the safe-fallback behavior on mixed-type groups is `chore(deps):`, which would silently skip the release.
 
+The two peer-matching rules are intentionally redundant. Renovate [merges matching rules in order, with later rules overriding earlier ones](https://docs.renovatebot.com/configuration-options/#packagerules), which makes the generic rule a fallback: a peer dependency added to `package.json` but absent from the named list still receives the `feat(deps)!:` prefix on its own commit, producing an ungrouped breaking commit rather than a silent release skip.
+
 If no commits since the last tag qualify for a release — for example, only `chore:` or non-conventional commits have landed — semantic-release logs "no release published" and exits.
 
 ## Manual releases
