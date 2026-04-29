@@ -11,7 +11,7 @@
 
 ## Test suite and coverage
 
-The test suite lives in [`test/`](test/) and runs under Vitest. `npm test` runs the suite; `npm run test:coverage` runs it with v8 coverage and is the variant CI and the release workflow use.
+The test suite lives in [`test/`](test/) and runs under Vitest. `npm test` runs the suite; `npm run test:coverage` runs it with [v8 coverage](https://vitest.dev/guide/coverage.html#v8-provider) and is the variant CI and the release workflow use.
 
 Coverage thresholds are enforced in [`vitest.config.ts`](vitest.config.ts) at 100% across statements, branches, functions, and lines. Falling below any threshold exits non-zero and turns CI or the release red. New code is expected to keep the suite at 100%, either with real tests or — for branches provably unreachable through the plugin's public surface — an inline `/* v8 ignore */` with a one-line reason.
 
