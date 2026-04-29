@@ -55,7 +55,7 @@ dts({
 The entry point is stubbed out so Rollup only provides the input/output config. All real work happens in the `generateBundle` hook: declarations are emitted via tsc, fed to api-extractor, and the result is output as an asset.
 
 ## Releases
-Versions are cut automatically when Renovate dependency updates land on `main`; `npm run release` is used for manual releases when grouping changes together. Both paths require the full test suite to pass (CI enforces 100% coverage) before publishing to npm with OIDC provenance. See [RELEASING.md](/RELEASING.md) for the full pipeline.
+Releases publish to npm with OIDC provenance after the test suite passes at 100% coverage. Renovate updates on `main` release automatically; `npm run release` cuts a manual release. See [RELEASING.md](/RELEASING.md) for details.
 
 ## License
 [MIT](/LICENSE)

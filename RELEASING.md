@@ -1,10 +1,8 @@
 # Releasing
 
-How `rollup-dts-bundler` ships to npm: the workflows, quality gates, and tooling behind a release.
+`rollup-dts-bundler` is published to npm through two release paths: a manual path driven by a maintainer version bump, and an automated path driven by Renovate dependency updates. Both converge on a single reusable GitHub Actions workflow that runs the test suite and publishes via OIDC trusted publishing. Release notes follow the [Conventional Commits](https://www.conventionalcommits.org/) Angular preset.
 
 ## Overview
-
-There are two release paths, and both converge on a single reusable workflow. Each one re-runs the full test suite before publishing and authenticates to npm via OIDC trusted publishing.
 
 | Path | Trigger | Version determined by | Release notes |
 |---|---|---|---|
