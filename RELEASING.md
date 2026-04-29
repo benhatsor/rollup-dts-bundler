@@ -27,7 +27,7 @@ The CI workflow, [`ci.yml`](.github/workflows/ci.yml), runs on every push to `ma
 
 ## Node engine policy
 
-The package declares no `engines.node` constraint. CI and the release workflow both run on Node's current LTS via `actions/setup-node`'s `node-version: 'lts/*'`, and the source code is written against APIs available in every supported Node release, so an explicit floor is not required. Consumers are implicitly gated by the runtime requirements of the project's transitive dependencies, which `npm install` reports through its standard engine warnings.
+The package declares no `engines.node` constraint. CI and the release workflow both run on Node's current LTS via `actions/setup-node`'s `node-version: 'lts/*'`, and the library source is written against APIs available in every supported Node release, so an explicit floor is not required. Test files are not held to the same restriction — they use newer APIs (namely `mkdtempDisposableSync`) freely, since tests only run on the LTS pinned by CI. Consumers are implicitly gated by the runtime requirements of the project's transitive dependencies, which `npm install` reports through its standard engine warnings.
 
 ## Automated releases
 
