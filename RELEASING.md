@@ -36,7 +36,7 @@ Automated releases are driven by Renovate. The pipeline is:
 1. Renovate opens a dependency-update pull request on its weekly schedule.
 2. CI runs against the pull request. If green, Renovate automerges it.
 3. The resulting push to `main` triggers [`release-auto.yml`](.github/workflows/release-auto.yml).
-4. That workflow gates on `github.actor == 'renovate[bot]'`, filtering out manual pushes, and calls the [`release.yml`](.github/workflows/release.yml) with the `is-auto: true` argument.
+4. That workflow gates on `github.actor == 'renovate[bot]'`, filtering out manual pushes, and calls [`release.yml`](.github/workflows/release.yml) with the `is-auto: true` argument.
 5. [`semantic-release`](https://github.com/semantic-release/semantic-release) runs end-to-end.
 
 The [`.releaserc.json`](.releaserc.json) config enables four semantic-release plugins:
@@ -116,6 +116,6 @@ Renovate's behavior is configured in [`renovate.json`](renovate.json). `automerg
 
 `rangeStrategy: replace` tells Renovate to leave a range alone when the new version still satisfies it, and to rewrite it only when the new version falls outside. With caret ranges, that means majors only. For peers, this has two consequences: minor and patch updates open no pull request (the existing caret already covers them), while a major update rewrites the range (e.g. `^4.0.0` becomes `^5.0.0`) in the same pull request that bumps the matching devDep.
 
-Major updates to peer or runtime deps are committed as `feat(deps)!:` and trigger a major release. The trailing `!` is the conventional-commits breaking-change marker, which the angular preset honors without needing a `BREAKING CHANGE:` body. Runtime dep minor and patch updates (lockfile-only changes) use `fix(deps):` and trigger a patch release. devDep updates use `chore(deps):` and trigger no release: a devDep major (e.g. Vitest 5) doesn't force a major on the library since it doesn't affect consumers.
+Major updates to peer or runtime deps are committed as `feat(deps)!:` and trigger a major release. The trailing `!` is the conventional-commits breaking-change marker, which the angular preset honors without needing a `BREAKING CHANGE:` body. Runtime dep minor and patch updates (lockfile-only changes) use `fix(deps):` and trigger a patch release. devDep updates use `chore(deps):` and trigger no release; a devDep major (e.g. Vitest 5) doesn't force a major on the library because it doesn't affect consumers.
 
 devDeps don't appear in `renovate.json` because they need no override. Renovate picks them up through the default `npm` manager and applies its default `chore(deps):` prefix — which is the intended behavior. The `packageRules` entries exist only to override that default for runtime and peer deps, where `chore(deps):` would otherwise swallow a release that should fire.
