@@ -30,9 +30,6 @@
   "files": [
     "dist"
   ],
-  "engines": {
-    "node": ">=24.10.0"
-  },
   "scripts": {
     "build": "rollup -c --configPlugin typescript={tsconfig:\\'rollup.tsconfig.json\\'}",
     "dev": "rollup -c --watch --configPlugin typescript={tsconfig:\\'rollup.tsconfig.json\\'}",

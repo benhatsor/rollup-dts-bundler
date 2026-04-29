@@ -29,12 +29,12 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: '24.10.0'
+          node-version: 'lts/*'
           cache: npm
           registry-url: https://registry.npmjs.org
 
       - name: Install dependencies
-        run: npm ci --engine-strict # Fail on dep min node version mismatch
+        run: npm ci
 
       - name: Typecheck
         run: npm run typecheck

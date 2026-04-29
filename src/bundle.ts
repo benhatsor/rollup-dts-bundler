@@ -21,7 +21,7 @@
 
 import type { NormalizedOutputOptions, OutputBundle, PluginContext } from 'rollup'
 import { join, dirname } from 'node:path'
-import { mkdirSync, readFileSync, writeFileSync, mkdtempDisposableSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { collectEntries, groupByTsconfig } from './entries'
 import { emitDeclarations } from './emit'
 import { buildTasks, runExtractors, type ExtractTask } from './extractor'
@@ -76,30 +76,34 @@ export async function bundleDeclarations(
     options.dir ?? (options.file ? dirname(options.file) : cwd)
   mkdirSync(outputDir, { recursive: true })
 
-  using tempDir = mkdtempDisposableSync(join(outputDir, '.rollup-dts-bundler-'))
-  writeFileSync(join(tempDir.path, '.gitignore'), '*')
-  writeFileSync(join(tempDir.path, 'CACHEDIR.TAG'), CACHEDIR_TAG)
+  const tempDir = mkdtempSync(join(outputDir, '.rollup-dts-bundler-'))
+  try {
+    writeFileSync(join(tempDir, '.gitignore'), '*')
+    writeFileSync(join(tempDir, 'CACHEDIR.TAG'), CACHEDIR_TAG)
 
-  const entries = collectEntries(ctx, bundle)
-  if (entries.length === 0) return
-  const groups = groupByTsconfig(ctx, entries, opts.tsconfig, cwd)
+    const entries = collectEntries(ctx, bundle)
+    if (entries.length === 0) return
+    const groups = groupByTsconfig(ctx, entries, opts.tsconfig, cwd)
 
-  let groupIndex = 0
-  for (const [tsconfigPath, groupEntries] of groups) {
-    // One subdir per group: source paths from different TS programs would
-    // otherwise collide if they shared a single `declarationDir`.
-    const groupDir = join(tempDir.path, `g${groupIndex++}`)
-    mkdirSync(groupDir, { recursive: true })
+    let groupIndex = 0
+    for (const [tsconfigPath, groupEntries] of groups) {
+      // One subdir per group: source paths from different TS programs would
+      // otherwise collide if they shared a single `declarationDir`.
+      const groupDir = join(tempDir, `g${groupIndex++}`)
+      mkdirSync(groupDir, { recursive: true })
 
-    const emitted = emitDeclarations(ctx, tsconfigPath, groupEntries, groupDir)
-    const tasks = buildTasks(ctx, {
-      tsconfigPath,
-      emitted,
-      bundledPackages: opts.bundledPackages,
-    })
-    runExtractors(ctx, tasks)
+      const emitted = emitDeclarations(ctx, tsconfigPath, groupEntries, groupDir)
+      const tasks = buildTasks(ctx, {
+        tsconfigPath,
+        emitted,
+        bundledPackages: opts.bundledPackages,
+      })
+      runExtractors(ctx, tasks)
 
-    await emitBundledAssets(ctx, tasks, bundle, options)
+      await emitBundledAssets(ctx, tasks, bundle, options)
+    }
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true })
   }
 
 }

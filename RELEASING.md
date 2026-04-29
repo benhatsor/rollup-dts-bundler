@@ -21,21 +21,13 @@ Coverage thresholds are enforced in [`vitest.config.ts`](vitest.config.ts) at 10
 
 The CI workflow, [`ci.yml`](.github/workflows/ci.yml), runs on every push to `main`, every pull request, and on manual dispatch.
 
-- **Matrix:** Node `24.10` (the declared floor) and `lts/*`, which drifts forward with Node's LTS line.
+- **Node:** `lts/*`, which drifts forward with Node's current LTS line.
 - **Steps:** `npm ci`, then `typecheck`, then `test:coverage`. There's no separate build step — [`test/dist.test.ts`](test/dist.test.ts) rebuilds `dist/` in its `beforeAll`, so a broken build surfaces as a failed test.
 - **Concurrency:** keyed per pull request and per commit SHA, with `cancel-in-progress: true`, so a new push to a pull request kills the outdated run.
 
 ## Node engine policy
 
-The [`package.json`](package.json) manifest declares:
-
-```json
-"engines": { "node": ">=24.10.0" }
-```
-
-The earliest API the plugin itself needs is `fs.mkdtempDisposableSync` (Node 24.4), but the floor sits at 24.10 because `semantic-release` — which drives the automated release path — requires it.
-
-`npm ci` runs with `--engine-strict`, so it fails with `EBADENGINE` if any installed dependency raises its `engines.node` above the project's floor. The CI matrix is also pinned to Node 24.10, so when a dependency raises its Node floor above that, CI turns red and Renovate's automerge stalls, leaving the conflict for the maintainer to handle. From there, the fix is either to bump the project's `engines` with a `feat!:` commit (triggering a major release), or to hold the dep with a Renovate ignore rule.
+The package declares no `engines.node` constraint. CI and the release workflow both run on Node's current LTS via `actions/setup-node`'s `node-version: 'lts/*'`, and the source code is written against APIs available in every supported Node release, so an explicit floor is not required. Consumers are implicitly gated by the runtime requirements of the project's transitive dependencies, which `npm install` reports through its standard engine warnings.
 
 ## Automated releases
 
@@ -108,7 +100,7 @@ The manual path exists alongside the automated one because features often span m
 
 ## Reusable release workflow
 
-Both release paths call a single `workflow_call` workflow defined in [`release.yml`](.github/workflows/release.yml). It checks out with full history (needed for tag detection) and sets up Node 24.10 with the npm registry configured. After installing deps, it runs typecheck, tests with coverage, and an explicit build step. The build step produces the `dist/` artifact for publish; `test/dist.test.ts` would also build it via `beforeAll`, but keeping `build` explicit makes the publish precondition visible.
+Both release paths call a single `workflow_call` workflow defined in [`release.yml`](.github/workflows/release.yml). It checks out with full history (needed for tag detection) and sets up Node's current LTS with the npm registry configured. After installing deps, it runs typecheck, tests with coverage, and an explicit build step. The build step produces the `dist/` artifact for publish; `test/dist.test.ts` would also build it via `beforeAll`, but keeping `build` explicit makes the publish precondition visible.
 
 It then branches on the `inputs.is-auto` argument: the manual path runs `npm publish` followed by `conventional-changelog | gh release create`; the automated path runs `npx semantic-release`.
 
