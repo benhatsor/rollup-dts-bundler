@@ -1,22 +1,18 @@
 /**
- * `generateBundle` handler — invoked once the chunk graph is assembled. One
- * of two files (along with `index.ts`) that make up the plugin's surface to
- * Rollup. Runs once per Rollup output, after `index.ts`'s build hooks have
- * populated the bundle with stub chunks.
+ * `generateBundle` handler. Paired with `index.ts`, which populates the
+ * bundle with stub chunks during the build phase. Runs once per Rollup output.
  *
- * `bundleDeclarations` orchestrates the three pipeline stages, then calls
- * `emitBundledAssets` to swap each stub chunk for its bundled `.d.ts`.
+ * `bundleDeclarations` drives the pipeline:
  *
- * Flow:
- *   - Set up a scratch tempdir under Rollup's output dir
- *     (location matters — see note below).
- *   - Stage 1: collect entries and partition them by tsconfig
- *     (`collectEntries` + `groupByTsconfig`).
- *   - Stages 2 and 3 run inside a per-group loop, sharing a TS program:
- *       2. emit `.d.ts` with `tsc`        — `emitDeclarations`
- *       3. bundle them with api-extractor — `buildTasks` + `runExtractors`
- *   - Final step: swap stub chunks for bundled `.d.ts` assets
- *     (`emitBundledAssets`).
+ *   1. Allocate a scratch tempdir under Rollup's output dir
+ *      (location is constrained; see note below).
+ *   2. Collect entries and partition them by tsconfig
+ *      (`collectEntries` + `groupByTsconfig`).
+ *   3. For each tsconfig group:
+ *        a. Emit `.d.ts` with `tsc`        — `emitDeclarations`.
+ *        b. Bundle them with api-extractor — `buildTasks` + `runExtractors`.
+ *   4. Replace each stub chunk with its bundled `.d.ts`
+ *      (`emitBundledAssets`).
  */
 
 import type { NormalizedOutputOptions, OutputBundle, PluginContext } from 'rollup'
@@ -27,7 +23,7 @@ import { emitDeclarations } from './emit'
 import { buildTasks, runExtractors, type ExtractTask } from './extractor'
 import type { DtsOptions } from './index'
 
-// Standard cache-directory tag (https://bford.info/cachedir/) — backup tools
+// Standard cache-directory tag (https://bford.info/cachedir/). Backup tools
 // detect this signature and skip the directory's contents.
 const CACHEDIR_TAG =
   'Signature: 8a477f597d28d172789f06886806bc55\n' +
@@ -43,21 +39,20 @@ export async function bundleDeclarations(
 
   const cwd = process.cwd()
 
-  // The scratch dir's location is constrained from both directions by how
-  // api-extractor (via TS) resolves modules from our emitted `.d.ts` files:
+  // The scratch dir's location is constrained on both sides by how
+  // api-extractor (via TS) resolves modules from emitted `.d.ts` files:
   //
-  //   - It must not sit under `node_modules/`. TS flags any path containing
-  //     `/node_modules/` as `isExternalLibraryImport`, which would make
-  //     api-extractor misclassify our internal modules as third-party.
-  //   - It must sit under the project root. Emitted `.d.ts` files import real
-  //     packages, and api-extractor resolves them by walking up from each
-  //     scratch file looking for `node_modules` — `os.tmpdir()` would walk
-  //     all the way to `/` and find nothing.
+  //   - Not under `node_modules/`: TS flags any path containing
+  //     `/node_modules/` as `isExternalLibraryImport`, causing
+  //     api-extractor to misclassify internal modules as third-party.
+  //   - Under the project root: emitted `.d.ts` files import real
+  //     packages, and api-extractor resolves them by walking up looking
+  //     for `node_modules`; `os.tmpdir()` would walk to `/` and find none.
   //
-  // So we put it inside Rollup's output dir, falling back to cwd if the
-  // caller used `rollup().generate()` with neither `output.dir` nor
-  // `output.file`. The `.gitignore` and `CACHEDIR.TAG` written below keep
-  // crash leftovers out of Git and backup tools.
+  // The dir therefore sits inside Rollup's output dir, falling back to cwd
+  // when `rollup().generate()` is called with neither `output.dir` nor
+  // `output.file`. The `.gitignore` and `CACHEDIR.TAG` below keep crash
+  // leftovers out of Git and backup tools.
   //
   // Source references — `isExternalLibraryImport` check:
   //   - api-extractor reads `resolvedModule.isExternalLibraryImport`:
@@ -87,8 +82,8 @@ export async function bundleDeclarations(
 
     let groupIndex = 0
     for (const [tsconfigPath, groupEntries] of groups) {
-      // One subdir per group: source paths from different TS programs would
-      // otherwise collide if they shared a single `declarationDir`.
+      // One subdir per group; source paths from different TS programs
+      // would otherwise collide under a shared `declarationDir`.
       const groupDir = join(tempDir, `g${groupIndex++}`)
       mkdirSync(groupDir, { recursive: true })
 
@@ -108,10 +103,10 @@ export async function bundleDeclarations(
 
 }
 
-// Final step of `bundleDeclarations` — replace each stub JS chunk with a
-// `.d.ts` asset at the same path. We delete the chunk and re-emit as an
-// asset (rather than just mutating `chunk.code`) so downstream plugins and
-// sourcemap handling stop treating the output as JS.
+// Final step of `bundleDeclarations`: replace each stub JS chunk with a
+// `.d.ts` asset at the same path. Rollup's docs warn against mutating
+// bundle entries directly, so we use `emitFile`:
+// https://rollupjs.org/plugin-development/#generatebundle
 async function emitBundledAssets(
   ctx: PluginContext,
   tasks: ExtractTask[],

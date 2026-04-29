@@ -1,18 +1,19 @@
 /**
- * Pipeline stage 3 — api-extractor. Runs once per tsconfig group, after
+ * Pipeline stage 3: api-extractor. Runs once per tsconfig group, after
  * stage 2 has produced a `.d.ts` for every entry in the group.
  *
- * `buildTasks` turns each emitted `.d.ts` into an `ExtractorConfig`, anchored
- * to the entry's nearest named `package.json` (api-extractor requires one;
- * see the inline note for why we anchor per-entry rather than per-group).
+ * `buildTasks` turns each emitted `.d.ts` into an `ExtractorConfig`,
+ * anchored to the entry's nearest named `package.json`. api-extractor
+ * requires one; see the inline note for why anchoring is per-entry rather
+ * than per-group.
  *
- * `runExtractors` then invokes api-extractor on every task in the group with
- * a single shared `CompilerState`, so TypeScript parses the sources just once.
- * Messages from api-extractor are forwarded to Rollup's `warn` / `error`
- * instead of going through its default console logger.
+ * `runExtractors` invokes api-extractor on each task, with a single `CompilerState`
+ * shared across the tsconfig group so TypeScript parses the sources only once.
+ * Messages route through Rollup's `warn` / `error` instead of
+ * api-extractor's default console logger.
  *
  * Each task records the path where its bundled `.d.ts` will be written;
- * `bundle.ts` later reads that file and emits it as a Rollup asset in place
+ * `bundle.ts` later reads that file and emits it as a Rollup asset, in place
  * of the original stub chunk.
  */
 
@@ -38,32 +39,31 @@ export function buildTasks(
   },
 ): ExtractTask[] {
 
-  // Why we resolve a `package.json` per entry, with `PackageJsonLookup`:
+  // A `package.json` is resolved per entry, via `PackageJsonLookup`:
   //
   //   1. `ExtractorConfig.prepare` requires a `packageJsonFullPath` even
-  //      when called programmatically — `Collector` throws if
-  //      `packageFolder` / `packageJson` are unset (there's an open upstream
-  //      TODO to drop the requirement). Without an api-extractor config file to
-  //      provide a default, we resolve it ourselves.
+  //      when called programmatically: `Collector` throws if
+  //      `packageFolder` / `packageJson` are unset (there's an upstream
+  //      TODO to lift this). Without an api-extractor config file to
+  //      supply a default, we must resolve the path ourselves.
   //
-  //   2. The result matters: the resolved `packageJson.name` becomes
-  //      `workingPackage.name`, which `DeclarationReferenceGenerator` stamps
-  //      onto every internal symbol. We anchor per entry rather than per
-  //      group so each entry gets the correct package name — the wrong one
-  //      would mislabel symbols. With our reports disabled this is only
-  //      observable via TSDoc `{@link pkg!Symbol}` resolution, but it's
-  //      still wrong.
+  //   2. The result does matter: the resolved `packageJson.name`
+  //      becomes `workingPackage.name`, which
+  //      `DeclarationReferenceGenerator` stamps onto every internal
+  //      symbol. Anchoring per entry rather than per group keeps the
+  //      name correct. With reports disabled this is only observable
+  //      via TSDoc `{@link pkg!Symbol}` resolution, but it's still wrong.
   //
-  //   3. `PackageJsonLookup` skips nameless `package.json` files; a manual
-  //      ancestor walk would stop at the first one. Monorepo roots are
-  //      often intentionally nameless, and stopping there would make
-  //      `prepare` throw `MISSING_NAME_FIELD`.
+  //   3. `PackageJsonLookup` skips nameless `package.json` files; a
+  //      manual ancestor walk would stop at the first one. Monorepo
+  //      roots are often intentionally nameless, and stopping there
+  //      would make `ExtractorConfig.prepare` throw `MISSING_NAME_FIELD`.
   //
-  //   4. One instance per call: its cache amortizes across entries, and a
-  //      fresh instance per invocation avoids stale reads in watch mode.
+  //   4. One instance per call. Subsequent lookups hit its cache, and a
+  //      fresh instance avoids stale reads in watch mode.
   //
   // References:
-  //   - Collector throws without `packageFolder` + `packageJson` (with TODO to lift it):
+  //   - Collector throws without `packageFolder` + `packageJson` (w/ TODO to lift it):
   //     https://github.com/microsoft/rushstack/blob/68497c5580db64436d7b854ac4135a47bb86deb7/apps/api-extractor/src/collector/Collector.ts#L123-L127
   //   - `ExtractorConfig.prepare` derives both from `packageJsonFullPath`:
   //     https://github.com/microsoft/rushstack/blob/68497c5580db64436d7b854ac4135a47bb86deb7/apps/api-extractor/src/api/ExtractorConfig.ts#L851-L867
@@ -84,8 +84,7 @@ export function buildTasks(
     }
 
     // Place the bundled output next to its source `.d.ts` in the scratch
-    // dir; reusing TS's already-unique `dtsPath` avoids inventing a naming
-    // scheme of our own.
+    // dir; this lets us reuse TS's already-unique `dtsPath` instead of inventing a name.
     const bundledDtsPath = dtsPath.replace(/\.d\.ts$/, '.bundled.d.ts')
 
     const extractorConfig = ExtractorConfig.prepare({
@@ -112,11 +111,11 @@ export function buildTasks(
 
 export function runExtractors(ctx: PluginContext, tasks: ExtractTask[]): void {
 
-  // Build one `CompilerState` from the first task and feed the remaining
-  // entry points in as `additionalEntryPoints`. Sharing it across every
+  // Build one `CompilerState` from the first task, passing the remaining
+  // entry points as `additionalEntryPoints`. Sharing it across every
   // `Extractor.invoke` call means TS parses the group's sources just once.
-  // `tasks` is non-empty by construction: `groupByTsconfig` never produces
-  // empty groups, and `buildTasks` returns one task per group entry.
+  // Note: `tasks` is non-empty by construction (`groupByTsconfig` never produces
+  // empty groups).
   const [first, ...rest] = tasks
   const compilerState = CompilerState.create(first!.extractorConfig, {
     additionalEntryPoints: rest.map((t) => t.extractorConfig.mainEntryPointFilePath),
@@ -124,16 +123,16 @@ export function runExtractors(ctx: PluginContext, tasks: ExtractTask[]): void {
 
   for (const { extractorConfig } of tasks) {
     Extractor.invoke(extractorConfig, {
-      // `localBuild: true` relaxes CI-mode checks (e.g. don't fail the
-      // build on a missing API report).
+      // `localBuild: true` disables api-extractor CI-mode checks,
+      // e.g. so a missing API report doesn't fail the build.
       localBuild: true,
       compilerState,
       messageCallback: (msg) => {
-        // Mark every message handled to silence api-extractor's default
-        // console logger; diagnostics flow through Rollup instead, so the
-        // user sees one consistent stream.
+        // Marking every message as handled silences api-extractor's default
+        // console logger, so diagnostics flow through Rollup as a single
+        // consistent stream.
         msg.handled = true
-        /* v8 ignore start -- only fires when api-extractor's `messages` config elevates a level to Error/Warning, which the plugin doesn't expose */
+        /* v8 ignore start -- only fires when api-extractor's `messages` config elevates a level to Error/Warning, which this plugin doesn't expose */
         if (msg.logLevel === ExtractorLogLevel.Error) ctx.error(msg.text)
         if (msg.logLevel === ExtractorLogLevel.Warning) ctx.warn(msg.text)
         /* v8 ignore stop */

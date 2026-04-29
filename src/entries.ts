@@ -1,16 +1,13 @@
 /**
- * Pipeline stage 1 — entry discovery and grouping. Runs once per Rollup
- * output, before the per-group work in stages 2 and 3 begins.
+ * Pipeline stage 1: entry discovery and grouping.
  *
- * `collectEntries` walks Rollup's output bundle and pairs each chunk with the
- * absolute path of its source entry module. `emitDeclarations` uses that path
- * in stage 2 to locate each entry's emitted `.d.ts`.
+ * `collectEntries` pairs each Rollup chunk with its source entry's
+ * absolute path; stage 2 uses that path to locate the emitted `.d.ts`.
  *
- * `groupByTsconfig` then partitions those entries by tsconfig — either the
- * user's override (one group covering everything) or each entry's nearest
- * `tsconfig.json`. Entries that share a tsconfig share a TS program in
- * stage 2, which lets api-extractor reuse a single `CompilerState` across
- * the group in stage 3.
+ * `groupByTsconfig` partitions entries by tsconfig: either an override
+ * or each entry's nearest `tsconfig.json`. Stages 2 and 3 then run once
+ * per group, with entries in the same group sharing a TS program in
+ * stage 2 and a `CompilerState` in stage 3.
  */
 
 import type { OutputBundle, OutputChunk, PluginContext } from 'rollup'
@@ -32,10 +29,9 @@ export function collectEntries(ctx: PluginContext, bundle: OutputBundle): Entry[
   })
 }
 
-// With an override, every entry collapses into a single group. Without one,
-// each entry walks up from its own directory to the nearest `tsconfig.json`;
-// entries that land on the same config share a group — and, downstream, a
-// TS program.
+// With an override, all entries collapse into a single group. Without one,
+// each entry walks up to its nearest `tsconfig.json`; entries landing on
+// the same config share a group — and, downstream, a TS program.
 export function groupByTsconfig(
   ctx: PluginContext,
   entries: Entry[],
@@ -46,9 +42,6 @@ export function groupByTsconfig(
   const groups = new Map<string, Entry[]>()
 
   for (const entry of entries) {
-    // If an override was given, resolve it relative to cwd. Otherwise,
-    // let TS's own resolver walk up from the entry's directory to the
-    // nearest `tsconfig.json`.
     const tsconfigPath = override
       ? resolve(cwd, override)
       : ts.findConfigFile(dirname(entry.entryAbsPath), ts.sys.fileExists)
