@@ -32,7 +32,7 @@ const formatHost: ts.FormatDiagnosticsHost = {
 function reportDiagnostics(ctx: PluginContext, diags: readonly ts.Diagnostic[]): void {
   const errors = diags.filter((d) => d.category === ts.DiagnosticCategory.Error)
   const warnings = diags.filter((d) => d.category === ts.DiagnosticCategory.Warning)
-  /* v8 ignore next -- TS6 rarely emits Warning-category diagnostics in practice @@@ */
+  /* v8 ignore next -- TS's `Diagnostics` table has no Warning-category entries today; defensive against future TS releases */
   if (warnings.length) ctx.warn(ts.formatDiagnosticsWithColorAndContext(warnings, formatHost))
   if (errors.length) ctx.error(ts.formatDiagnosticsWithColorAndContext(errors, formatHost))
 }

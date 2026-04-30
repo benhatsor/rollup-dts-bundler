@@ -93,7 +93,7 @@ export async function bundleDeclarations(
         emitted,
         bundledPackages: opts.bundledPackages,
       })
-      runExtractors(ctx, tasks)
+      runExtractors(tasks)
 
       await emitBundledAssets(ctx, tasks, bundle, options)
     }

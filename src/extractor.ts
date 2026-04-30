@@ -9,8 +9,7 @@
  *
  * `runExtractors` invokes api-extractor on each task, with a single `CompilerState`
  * shared across the tsconfig group so TypeScript parses the sources only once.
- * Messages route through Rollup's `warn` / `error` instead of
- * api-extractor's default console logger.
+ * api-extractor's console chatter is silenced; see the note in `messageCallback`.
  *
  * Each task records the path where its bundled `.d.ts` will be written;
  * `bundle.ts` later reads that file and emits it as a Rollup asset, in place
@@ -19,7 +18,7 @@
 
 import { dirname } from 'node:path'
 import type { PluginContext } from 'rollup'
-import { CompilerState, Extractor, ExtractorConfig, ExtractorLogLevel } from '@microsoft/api-extractor'
+import { CompilerState, Extractor, ExtractorConfig } from '@microsoft/api-extractor'
 import { PackageJsonLookup } from '@rushstack/node-core-library'
 import type { EmittedEntry } from './emit'
 import type { Entry } from './entries'
@@ -109,7 +108,7 @@ export function buildTasks(
 
 }
 
-export function runExtractors(ctx: PluginContext, tasks: ExtractTask[]): void {
+export function runExtractors(tasks: ExtractTask[]): void {
 
   // Build one `CompilerState` from the first task, passing the remaining
   // entry points as `additionalEntryPoints`. Sharing it across every
@@ -128,14 +127,12 @@ export function runExtractors(ctx: PluginContext, tasks: ExtractTask[]): void {
       localBuild: true,
       compilerState,
       messageCallback: (msg) => {
-        // Marking every message as handled silences api-extractor's default
-        // console logger, so diagnostics flow through Rollup as a single
-        // consistent stream.
+        // Silence the per-invocation preamble ("Analysis will use the
+        // bundled TypeScript version ...") that would otherwise print on
+        // every build. Analyzer warnings (e.g. a public symbol referencing
+        // a non-exported type) default to `logLevel: none` under our
+        // configObject and never reach this callback.
         msg.handled = true
-        /* v8 ignore start -- requires api-extractor to surface an Error- or Warning-level message; the test fixtures are clean enough that none fire @@@ */
-        if (msg.logLevel === ExtractorLogLevel.Error) ctx.error(msg.text)
-        if (msg.logLevel === ExtractorLogLevel.Warning) ctx.warn(msg.text)
-        /* v8 ignore stop */
       },
     })
   }
