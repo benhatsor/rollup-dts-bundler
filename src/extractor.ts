@@ -132,7 +132,7 @@ export function runExtractors(ctx: PluginContext, tasks: ExtractTask[]): void {
         // console logger, so diagnostics flow through Rollup as a single
         // consistent stream.
         msg.handled = true
-        /* v8 ignore start -- only fires when api-extractor's `messages` config elevates a level to Error/Warning, which this plugin doesn't expose */
+        /* v8 ignore start -- requires api-extractor to surface an Error- or Warning-level message; the test fixtures are clean enough that none fire @@@ */
         if (msg.logLevel === ExtractorLogLevel.Error) ctx.error(msg.text)
         if (msg.logLevel === ExtractorLogLevel.Warning) ctx.warn(msg.text)
         /* v8 ignore stop */

@@ -29,7 +29,8 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 'lts/*'
+          # Run on Maintenance LTS — the oldest still-supported Node line.
+          node-version: 'lts/-1'
           cache: npm
           registry-url: https://registry.npmjs.org
 
@@ -40,7 +41,7 @@ jobs:
         run: npm run typecheck
 
       # Re-run tests with the full merged code. Uses `test:coverage` (not
-      # `test`) so the coverage threshold is enforced at release time too —
+      # `test`) so the coverage threshold is enforced at release time, too;
       # if anything bypassed CI, the release gate still catches it.
       # `test/dist.test.ts` self-builds dist via its own `beforeAll`, so
       # this step doesn't depend on a prior build.

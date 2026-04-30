@@ -19,13 +19,13 @@ Coverage thresholds are enforced in [`vitest.config.ts`](vitest.config.ts) at 10
 
 The CI workflow, [`ci.yml`](.github/workflows/ci.yml), runs on every push to `main`, every pull request, and on manual dispatch.
 
-- **Node:** `lts/*`, which drifts forward with Node's current LTS line.
+- **Node:** `lts/-1` — see [Node engine policy](#node-engine-policy) below.
 - **Steps:** `npm ci`, then `typecheck`, then `test:coverage`. There's no separate build step — [`test/dist.test.ts`](test/dist.test.ts) rebuilds `dist/` in its `beforeAll`, so a broken build surfaces as a failed test.
 - **Concurrency:** keyed per pull request and per commit SHA, with `cancel-in-progress: true`, so a new push to a pull request kills the outdated run.
 
 ## Node engine policy
 
-The package declares no `engines.node` constraint. CI and the release workflow both run on Node's current LTS via `actions/setup-node`'s `node-version: 'lts/*'`, and the library source is written against APIs available in every [supported Node release](https://nodejs.org/en/about/previous-releases), so an explicit floor is not required. Test files are not held to the same restriction — they use newer APIs (namely `mkdtempDisposableSync`) freely, since tests only run on the LTS pinned by CI. Consumers are implicitly gated by the runtime requirements of the project's transitive dependencies, which `npm install` reports through its standard engine warnings.
+The package declares no `engines.node` constraint. The source only uses APIs available in every [supported Node release](https://nodejs.org/en/about/previous-releases), and consumers are implicitly gated by the engine requirements of transitive dependencies. CI and the release workflow pin `node-version: 'lts/-1'` — Maintenance LTS, the oldest still-supported line — so the suite always runs against the lowest version a consumer can reasonably still be on. The alias drifts forward automatically as each maintenance line ages out.
 
 ## Automated releases
 
@@ -98,7 +98,7 @@ The manual path exists alongside the automated one because features often span m
 
 ## Reusable release workflow
 
-Both release paths call a single `workflow_call` workflow defined in [`release.yml`](.github/workflows/release.yml). It checks out with full history (needed for tag detection) and sets up Node's current LTS with the npm registry configured. After installing deps, it runs typecheck, tests with coverage, and an explicit build step. The build step produces the `dist/` artifact for publish; `test/dist.test.ts` would also build it via `beforeAll`, but keeping `build` explicit makes the publish precondition visible.
+Both release paths call a single `workflow_call` workflow defined in [`release.yml`](.github/workflows/release.yml). It checks out with full history (needed for tag detection) and sets up Node's maintenance LTS (see [Node engine policy](#node-engine-policy)) with the npm registry configured. After installing deps, it runs typecheck, tests with coverage, and an explicit build step. The build step produces the `dist/` artifact for publish; `test/dist.test.ts` would also build it via `beforeAll`, but keeping `build` explicit makes the publish precondition visible.
 
 It then branches on the `inputs.is-auto` argument: the manual path runs `npm publish` followed by `conventional-changelog | gh release create`; the automated path runs `npx semantic-release`.
 
