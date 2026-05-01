@@ -2,7 +2,7 @@
 
 [![npm version][npm-version-src]][npm-version-href]
 [![CI][ci-src]][ci-href]
-[![Coverage][coverage-src]][coverage-href]
+[![Coverage Status][coverage-src]][coverage-href]
 
 Rollup plugin for bundling `.d.ts` declarations via [@microsoft/api-extractor].
 
@@ -72,5 +72,5 @@ Releases publish to npm with OIDC provenance after the test suite passes at 100%
 [npm-version-href]: https://npmjs.com/package/rollup-dts-bundler
 [ci-src]: https://github.com/benhatsor/rollup-dts-bundler/actions/workflows/ci.yml/badge.svg
 [ci-href]: https://github.com/benhatsor/rollup-dts-bundler/actions/workflows/ci.yml
-[coverage-src]: https://img.shields.io/badge/coverage-100%25-brightgreen
-[coverage-href]: https://github.com/benhatsor/rollup-dts-bundler/blob/main/vitest.config.ts
+[coverage-src]: https://coveralls.io/repos/github/benhatsor/rollup-dts-bundler/badge.svg?branch=main
+[coverage-href]: https://coveralls.io/github/benhatsor/rollup-dts-bundler?branch=main

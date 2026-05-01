@@ -39,3 +39,9 @@ jobs:
       # separate Build step.
       - name: Run tests with coverage
         run: npm run test:coverage
+
+      - name: Upload coverage to Coveralls
+        uses: coverallsapp/github-action@v2.3.6
+        with:
+          github-token: ${{ github.token }}
+          file: ./coverage/lcov.info
