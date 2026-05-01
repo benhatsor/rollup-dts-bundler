@@ -25,7 +25,7 @@ The CI workflow, [`ci.yml`](.github/workflows/ci.yml), runs on every push to `ma
 
 ## Node engine policy
 
-The package declares no `engines.node` constraint. The source only uses APIs available in every [supported Node release](https://nodejs.org/en/about/previous-releases), and consumers are additionally implicitly gated by the engine requirements of transitive dependencies.
+The package declares no `engines.node` constraint. The source only uses APIs available in every [supported Node release](https://nodejs.org/en/about/previous-releases), and consumers are additionally gated by the engine requirements of transitive dependencies.
 
 ## Automated releases
 
