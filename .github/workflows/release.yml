@@ -14,9 +14,8 @@ concurrency:
 
 jobs:
   # Re-run tests on the full merged code before
-  # publishing an auto-merged Renovate release.
+  # publishing a release.
   verify:
-    if: ${{ inputs.is-auto }}
     uses: ./.github/workflows/ci.yml
     permissions:
       contents: read

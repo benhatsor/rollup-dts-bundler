@@ -100,7 +100,7 @@ The manual path exists alongside the automated one because features often span m
 
 Both release paths call a single `workflow_call` workflow defined in [`release.yml`](.github/workflows/release.yml), which runs as two jobs:
 
-1. **`verify`** only runs for automated Renovate merges. It calls [`ci.yml`](.github/workflows/ci.yml) as a reusable workflow, applying the same typecheck and `test:coverage` gate that pull requests see. It's skipped for manual tag releases, letting `publish` run unimpeded.
+1. **`verify`** calls [`ci.yml`](.github/workflows/ci.yml) as a reusable workflow, applying the same typecheck and `test:coverage` gate that pull requests see.
 2. **`publish`** depends on `verify`. It checks out with full history (required for tag detection by `semantic-release` and `conventional-changelog`), sets up Node on `lts/*` with the npm registry configured, and installs dependencies. It then builds the publish artifact, and branches on the `inputs.is-auto` argument: the manual path runs `npm publish` followed by `conventional-changelog | gh release create`; the automated path runs `npx semantic-release`.
 
 The jobs run on separate runners.
