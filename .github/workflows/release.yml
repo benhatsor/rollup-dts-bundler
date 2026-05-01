@@ -13,7 +13,16 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
+  # Re-run tests on the full merged code before
+  # publishing an auto-merged Renovate release
+  verify:
+    if: ${{ inputs.is-auto }}
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  publish:
+    needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -29,28 +38,13 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          # Run on Maintenance LTS — the oldest still-supported Node line.
-          node-version: 'lts/-1'
+          node-version: 'lts/*'
           cache: npm
           registry-url: https://registry.npmjs.org
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Typecheck
-        run: npm run typecheck
-
-      # Re-run tests with the full merged code. Uses `test:coverage` (not
-      # `test`) so the coverage threshold is enforced at release time, too;
-      # if anything bypassed CI, the release gate still catches it.
-      # `test/dist.test.ts` self-builds dist via its own `beforeAll`, so
-      # this step doesn't depend on a prior build.
-      - name: Run tests
-        run: npm run test:coverage
-
-      # Build the publish artifact. The test step already builds dist as a
-      # side effect of `test/dist.test.ts`, but running `build` explicitly
-      # here keeps the build > publish chain readable in the workflow.
       - name: Build
         run: npm run build
 
