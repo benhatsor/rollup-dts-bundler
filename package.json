@@ -1,7 +1,7 @@
 {
   "name": "rollup-dts-bundler",
   "type": "module",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Rollup plugin for high-quality `.d.ts` bundling via @microsoft/api-extractor.",
   "author": "benhatsor",
   "license": "MIT",
