@@ -1,6 +1,6 @@
 # Releasing
 
-`rollup-dts-bundler` is published to npm through two release paths: a manual path driven by a maintainer version bump, and an automated path driven by [Renovate](https://github.com/apps/renovate) dependency updates. Both converge on a single reusable GitHub Actions workflow that runs the test suite and publishes via [OIDC trusted publishing](https://docs.npmjs.com/trusted-publishers). Release notes follow the [Conventional Commits](https://www.conventionalcommits.org/) Angular preset.
+`rollup-dts-bundler` is published to npm through two release paths: a manual path driven by a maintainer version bump, and an automated path driven by [Renovate](https://github.com/apps/renovate) dependency updates. Both run in a single GitHub Actions workflow that runs the test suite and publishes via [OIDC trusted publishing](https://docs.npmjs.com/trusted-publishers). Release notes follow the [Conventional Commits](https://www.conventionalcommits.org/) Angular preset.
 
 ## Overview
 
@@ -33,9 +33,8 @@ Automated releases are driven by Renovate. The pipeline is:
 
 1. Renovate opens a dependency-update pull request on its weekly schedule.
 2. CI runs against the pull request. If green, Renovate automerges it.
-3. The resulting push to `main` triggers [`release-auto.yml`](.github/workflows/release-auto.yml).
-4. That workflow gates on `github.actor == 'renovate[bot]'`, filtering out manual pushes, and calls [`release.yml`](.github/workflows/release.yml) with the `is-auto: true` argument.
-5. [`semantic-release`](https://github.com/semantic-release/semantic-release) runs end-to-end.
+3. The resulting push to `main` triggers [`release.yml`](.github/workflows/release.yml), which gates on `github.actor == 'renovate[bot]'` to filter out non-Renovate pushes.
+4. [`semantic-release`](https://github.com/semantic-release/semantic-release) runs end-to-end.
 
 The [`.releaserc.json`](.releaserc.json) config enables four semantic-release plugins:
 
@@ -85,7 +84,7 @@ npm run release
 
 This invokes [bumpp](https://github.com/antfu-collective/bumpp), which prompts for the new version (patch, minor, major, or custom). Once chosen, bumpp updates `package.json`, commits the change as `chore: release vX.Y.Z`, and creates an annotated tag. The branch and tag are then pushed together with `--follow-tags`.
 
-Pushing the tag triggers [`release-manual.yml`](.github/workflows/release-manual.yml), which calls [`release.yml`](.github/workflows/release.yml) with the `is-auto: false` argument. The bumpp commit itself lands on `main` but doesn't fire the automated path, since [`release-auto.yml`](.github/workflows/release-auto.yml) gates on `github.actor == 'renovate[bot]'`. The manual path then runs:
+Pushing the tag triggers [`release.yml`](.github/workflows/release.yml). The bumpp commit itself lands on `main` but doesn't fire the automated path, since the workflow gates the automated branch on `github.actor == 'renovate[bot]'`. The manual path then runs:
 
 ```bash
 npm publish --provenance --access public
@@ -96,20 +95,24 @@ Release notes are generated from conventional-style commits since the previous t
 
 The manual path exists alongside the automated one because features often span multiple commits — refactor, then infrastructure, then the feature itself. A manual tag push lets those commits be batched into a single release.
 
-## Reusable release workflow
+## Release workflow
 
-Both release paths call a single `workflow_call` workflow defined in [`release.yml`](.github/workflows/release.yml), which runs as two jobs:
+Both release paths run in a single workflow defined in [`release.yml`](.github/workflows/release.yml), triggered by tag pushes (`v*`) and pushes to `main`. It runs as two jobs:
 
 1. **`verify`** calls [`ci.yml`](.github/workflows/ci.yml) as a reusable workflow, applying the same typecheck and `test:coverage` gate that pull requests see.
-2. **`publish`** depends on `verify`. It checks out with full history (required for tag detection by `semantic-release` and `conventional-changelog`), sets up Node on `lts/*` with the npm registry configured, and installs dependencies. It then builds the publish artifact, and branches on the `inputs.is-auto` argument: the manual path runs `npm publish` followed by `conventional-changelog | gh release create`; the automated path runs `npx semantic-release`.
+2. **`publish`** depends on `verify`. It checks out with full history (required for tag detection by `semantic-release` and `conventional-changelog`), sets up Node on `lts/*` with the npm registry configured, and installs dependencies. It then builds the publish artifact and branches on the trigger: a tag push runs `npm publish` followed by `conventional-changelog | gh release create`; a Renovate-authored branch push runs `npx semantic-release`.
 
-The jobs run on separate runners.
+Both jobs share the gate `github.ref_type == 'tag' || github.actor == 'renovate[bot]'`, so an ordinary push to `main` skips the workflow. The jobs run on separate runners.
+
+The workflow has to be a single top-level workflow rather than a reusable workflow called by thinner triggers, because npm's trusted publisher matches against the caller workflow filename, not the reusable workflow's filename (see [npm/documentation#1755](https://github.com/npm/documentation/issues/1755)). Splitting manual and automatic into separate caller workflows would require two trusted publisher entries, but npm allows only one per package.
 
 Settings:
 
-- **Permissions:** `contents: write` (tags, commits, releases) and `id-token: write` (npm OIDC). Caller workflows have to grant both — a callee's permissions are a ceiling, not a grant.
+- **Permissions:** `contents: write` (tags, commits, releases) and `id-token: write` (npm OIDC).
 - **Concurrency:** `group: release`, `cancel-in-progress: false`. `npm publish` is irreversible, so an in-flight release must finish; additional triggers queue behind it.
 - **Timeout:** 15 minutes. Fails fast instead of GitHub Actions' six-hour default.
+
+The automatic step's `github.ref_type == 'branch'` check is defensive. GitHub [already blocks](https://docs.github.com/en/actions/using-workflows/triggering-a-workflow#triggering-a-workflow-from-a-workflow) the tag `semantic-release` pushes from re-triggering this workflow when using the default GitHub token, but the gate prevents a double-publish via the manual path if a different token is wired in later.
 
 ## Renovate configuration
 

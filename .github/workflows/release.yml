@@ -1,11 +1,11 @@
 name: Release
 
 on:
-  workflow_call:
-    inputs:
-      is-auto:
-        required: true
-        type: boolean
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - main
 
 # Queue release jobs
 concurrency:
@@ -16,12 +16,16 @@ jobs:
   # Re-run tests on the full merged code before
   # publishing a release.
   verify:
+    # Run on any tag push (manual release) or Renovate-authored
+    # push to main (automatic release).
+    if: github.ref_type == 'tag' || github.actor == 'renovate[bot]'
     uses: ./.github/workflows/ci.yml
     permissions:
       contents: read
 
   publish:
     needs: verify
+    if: github.ref_type == 'tag' || github.actor == 'renovate[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -47,9 +51,9 @@ jobs:
       - name: Build
         run: npm run build
 
-      # User-created tag: auto-generate changelog and publish.
+      # Tag push: auto-generate changelog and publish.
       - name: Manual release
-        if: ${{ !inputs.is-auto }}
+        if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -58,8 +62,12 @@ jobs:
             | gh release create "$GITHUB_REF_NAME" -F -
 
       # Renovate-authored merge to main: publish via semantic-release.
+      # `ref_type == 'branch'` is defensive: GitHub already blocks the
+      # tag semantic-release pushes from re-triggering this workflow
+      # when using the default GitHub token, but the gate prevents a double-publish
+      # via the manual path if a different token is ever wired in later.
       - name: Automatic release
-        if: ${{ inputs.is-auto }}
+        if: github.actor == 'renovate[bot]' && github.ref_type == 'branch'
         env:
           GITHUB_TOKEN: ${{ github.token }}
           NPM_CONFIG_PROVENANCE: 'true'
