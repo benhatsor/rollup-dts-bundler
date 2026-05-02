@@ -4,10 +4,10 @@
 [![CI][ci-src]][ci-href]
 [![Coverage Status][coverage-src]][coverage-href]
 
-Rollup plugin for high-quality `.d.ts` bundling via [@microsoft/api-extractor].
+Rollup plugin for accurate `.d.ts` bundling via [@microsoft/api-extractor].
 
 ## Why?
-[@microsoft/api-extractor] is Microsoft's official `.d.ts` bundler. It produces higher-quality output than common alternatives ([rollup-plugin-dts], [rolldown-plugin-dts], [dts-bundle-generator]), but is designed as a monolithic CLI with verbose config files. This plugin wraps it in a simple Rollup interface.
+[@microsoft/api-extractor] is Microsoft's official `.d.ts` bundler. Unlike common alternatives ([rollup-plugin-dts], [rolldown-plugin-dts], [dts-bundle-generator]), it doesn't mangle type names or drop re-exports. Problem is, it was designed as a monolithic CLI with verbose config files. This plugin exposes it as a simple Rollup interface.
 
 ## Usage
 
