@@ -112,7 +112,7 @@ Settings:
 - **Concurrency:** `group: release`, `cancel-in-progress: false`. `npm publish` is irreversible, so an in-flight release must finish; additional triggers queue behind it.
 - **Timeout:** 15 minutes. Fails fast instead of GitHub Actions' six-hour default.
 
-The automatic step's `github.ref_type == 'branch'` check is defensive. GitHub [already blocks](https://docs.github.com/en/actions/using-workflows/triggering-a-workflow#triggering-a-workflow-from-a-workflow) the tag `semantic-release` pushes from re-triggering this workflow when using the default GitHub token, but the gate prevents a double-publish via the manual path if a different token is wired in later.
+The workflow relies on GitHub's [default-token re-entry block](https://docs.github.com/en/actions/using-workflows/triggering-a-workflow#triggering-a-workflow-from-a-workflow) to prevent a publish step from re-triggering the workflow.
 
 ## Renovate configuration
 
