@@ -104,6 +104,8 @@ Both release paths run in a single workflow defined in [`release.yml`](.github/w
 
 Both jobs share the gate `github.ref_type == 'tag' || github.actor == 'renovate[bot]'`, so an ordinary push to `main` skips the workflow. The jobs run on separate runners.
 
+The workflow relies on GitHub's [default-token re-entry block](https://docs.github.com/en/actions/using-workflows/triggering-a-workflow#triggering-a-workflow-from-a-workflow) to prevent a publish step from re-triggering the workflow.
+
 The workflow has to be a single top-level workflow rather than a reusable workflow called by thinner triggers, because npm's trusted publisher matches against the caller workflow filename, not the reusable workflow's filename (see [npm/documentation#1755](https://github.com/npm/documentation/issues/1755)). Splitting manual and automatic into separate caller workflows would require two trusted publisher entries, but npm allows only one per package.
 
 Settings:
@@ -111,8 +113,6 @@ Settings:
 - **Permissions:** `contents: write` (tags, commits, releases) and `id-token: write` (npm OIDC).
 - **Concurrency:** `group: release`, `cancel-in-progress: false`. `npm publish` is irreversible, so an in-flight release must finish; additional triggers queue behind it.
 - **Timeout:** 15 minutes. Fails fast instead of GitHub Actions' six-hour default.
-
-The workflow relies on GitHub's [default-token re-entry block](https://docs.github.com/en/actions/using-workflows/triggering-a-workflow#triggering-a-workflow-from-a-workflow) to prevent a publish step from re-triggering the workflow.
 
 ## Renovate configuration
 
