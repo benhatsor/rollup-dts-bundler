@@ -4,7 +4,7 @@
 [![CI][ci-src]][ci-href]
 [![Coverage Status][coverage-src]][coverage-href]
 
-Rollup plugin for bundling `.d.ts` declarations via [@microsoft/api-extractor].
+Rollup plugin for high-quality TypeScript declaration bundling via [@microsoft/api-extractor].
 
 ## Why?
 [@microsoft/api-extractor] is Microsoft's official `.d.ts` bundler. It produces higher-quality output than common alternatives ([rollup-plugin-dts], [rolldown-plugin-dts], [dts-bundle-generator]), but is designed as a monolithic CLI with verbose config files. This plugin wraps it in a simple Rollup interface.
