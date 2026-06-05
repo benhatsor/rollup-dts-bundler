@@ -10,7 +10,7 @@ on:
 # Queue release jobs
 concurrency:
   group: release
-  cancel-in-progress: false
+  queue: max
 
 jobs:
   # Re-run tests on the full merged code before publishing a release.
@@ -46,6 +46,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Build for release
       - name: Build
         run: npm run build
 
