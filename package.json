@@ -3,15 +3,15 @@
   "type": "module",
   "version": "1.0.6",
   "description": "Rollup plugin for accurate .d.ts bundling via @microsoft/api-extractor.",
-  "author": "benhatsor",
+  "author": "barhatsor",
   "license": "MIT",
-  "homepage": "https://github.com/benhatsor/rollup-dts-bundler#readme",
+  "homepage": "https://github.com/barhatsor/rollup-dts-bundler#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/benhatsor/rollup-dts-bundler.git"
+    "url": "git+https://github.com/barhatsor/rollup-dts-bundler.git"
   },
   "bugs": {
-    "url": "https://github.com/benhatsor/rollup-dts-bundler/issues"
+    "url": "https://github.com/barhatsor/rollup-dts-bundler/issues"
   },
   "keywords": [
     "rollup",

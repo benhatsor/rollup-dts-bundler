@@ -70,7 +70,7 @@ Releases publish to npm with OIDC provenance after the test suite passes at 100%
 <!-- Badges -->
 [npm-version-src]: https://img.shields.io/npm/v/rollup-dts-bundler.svg
 [npm-version-href]: https://npmjs.com/package/rollup-dts-bundler
-[ci-src]: https://github.com/benhatsor/rollup-dts-bundler/actions/workflows/ci.yml/badge.svg
-[ci-href]: https://github.com/benhatsor/rollup-dts-bundler/actions/workflows/ci.yml
-[coverage-src]: https://coveralls.io/repos/github/benhatsor/rollup-dts-bundler/badge.svg?branch=main
-[coverage-href]: https://coveralls.io/github/benhatsor/rollup-dts-bundler?branch=main
+[ci-src]: https://github.com/barhatsor/rollup-dts-bundler/actions/workflows/ci.yml/badge.svg
+[ci-href]: https://github.com/barhatsor/rollup-dts-bundler/actions/workflows/ci.yml
+[coverage-src]: https://coveralls.io/repos/github/barhatsor/rollup-dts-bundler/badge.svg?branch=main
+[coverage-href]: https://coveralls.io/github/barhatsor/rollup-dts-bundler?branch=main
